@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ResQNet — User Dashboard</title>
+  <meta name="description" content="View and manage your disaster help requests on ResQNet.">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body class="dashboard-page">
+
+<!-- ── SIDEBAR ── -->
+<aside class="resq-sidebar" id="resq-sidebar">
+  <a href="index.html" class="sidebar-logo">
+    <div class="brand-icon">🚨</div>
+    <span class="brand-name">Res<span>Q</span>Net</span>
+  </a>
+  <nav class="sidebar-nav">
+    <div class="sidebar-section-title">Main</div>
+    <a href="user-dashboard.html" class="sidebar-nav-item active">
+      <span class="nav-icon">📊</span> Dashboard
+    </a>
+    <a href="help-request.html" class="sidebar-nav-item">
+      <span class="nav-icon">🆘</span> Request Help
+    </a>
+    <a href="report-disaster.html" class="sidebar-nav-item">
+      <span class="nav-icon">📢</span> Report Disaster
+    </a>
+    <a href="map.html" class="sidebar-nav-item">
+      <span class="nav-icon">🗺️</span> Live Map
+    </a>
+    <div class="sidebar-section-title" style="margin-top:10px">Account</div>
+    <a href="#" class="sidebar-nav-item" onclick="document.getElementById('profile-section').scrollIntoView({behavior:'smooth'})">
+      <span class="nav-icon">👤</span> Profile
+    </a>
+    <a href="#" class="sidebar-nav-item" onclick="handleLogout(); return false;">
+      <span class="nav-icon">🚪</span> Logout
+    </a>
+  </nav>
+  <div class="sidebar-footer">
+    <div class="sidebar-user">
+      <div class="sidebar-avatar" id="sidebar-avatar">U</div>
+      <div>
+        <div class="sidebar-user-name" id="sidebar-username">Loading...</div>
+        <div class="sidebar-user-role" id="sidebar-userrole">Disaster Reporter</div>
+      </div>
+    </div>
+  </div>
+</aside>
+
+<div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+<!-- ── MAIN CONTENT ── -->
+<main class="dashboard-content">
+  <!-- Header -->
+  <div class="dashboard-header">
+    <div>
+      <div class="dashboard-title">My Dashboard</div>
+      <div class="dashboard-subtitle">Track your help requests and AI analysis results</div>
+    </div>
+    <div class="flex items-center gap-12">
+      <div class="notif-wrapper" id="notif-wrapper">
+        <div class="notif-bell" id="notif-bell" onclick="toggleNotifDropdown()">
+          🔔
+          <div class="notif-badge" id="notif-badge">3</div>
+        </div>
+        <div class="notif-dropdown" id="notif-dropdown">
+          <div class="notif-header">
+            <div class="notif-header-title">🔔 Notifications</div>
+            <button class="notif-clear-btn" onclick="clearNotifications()">Mark all read</button>
+          </div>
+          <div class="notif-list" id="notif-list">
+            <div class="notif-empty">⏳ Loading...</div>
+          </div>
+          <div class="notif-footer">
+            <a href="#" onclick="closeNotifDropdown()">View all →</a>
+          </div>
+        </div>
+      </div>
+      <a href="help-request.html" class="btn btn-primary btn-sm">+ New Request</a>
+    </div>
+  </div>
+
+  <!-- Stats Grid -->
+  <div class="stats-grid-4 mb-24">
+    <div class="stat-card primary">
+      <div class="stat-icon primary">📋</div>
+      <div>
+        <div class="stat-value" id="stat-total">0</div>
+        <div class="stat-label">Total Requests</div>
+        <div class="stat-change up">↑ All time</div>
+      </div>
+    </div>
+    <div class="stat-card warning">
+      <div class="stat-icon warning">⏳</div>
+      <div>
+        <div class="stat-value" id="stat-pending">0</div>
+        <div class="stat-label">Pending</div>
+        <div class="stat-change down">Needs attention</div>
+      </div>
+    </div>
+    <div class="stat-card info">
+      <div class="stat-icon info">✅</div>
+      <div>
+        <div class="stat-value" id="stat-accepted">0</div>
+        <div class="stat-label">Accepted</div>
+        <div class="stat-change up">↑ In progress</div>
+      </div>
+    </div>
+    <div class="stat-card success">
+      <div class="stat-icon success">🎯</div>
+      <div>
+        <div class="stat-value" id="stat-completed">0</div>
+        <div class="stat-label">Completed</div>
+        <div class="stat-change up">↑ Resolved</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main Grid -->
+  <div class="dashboard-grid-main">
+    <!-- Left: Request History + Timeline + AI -->
+    <div>
+      <!-- Request History -->
+      <div class="resq-card mb-20">
+        <div class="flex items-center justify-between mb-16" style="flex-wrap:wrap;gap:10px">
+          <h6 style="font-weight:700;margin:0">Request History</h6>
+          <a href="help-request.html" class="btn btn-outline btn-sm">+ Submit New</a>
+        </div>
+        <div class="filter-bar">
+          <div class="filter-search">
+            <span class="filter-search-icon">🔍</span>
+            <input type="text" class="resq-input" id="search-input" placeholder="Search requests...">
+          </div>
+          <select class="resq-select" id="status-filter" style="width:auto;min-width:130px">
+            <option value="">All Statuses</option>
+            <option value="Pending">Pending</option>
+            <option value="Accepted">Accepted</option>
+            <option value="Completed">Completed</option>
+          </select>
+          <select class="resq-select" id="type-filter" style="width:auto;min-width:120px">
+            <option value="">All Types</option>
+            <option value="Rescue">Rescue</option>
+            <option value="Food">Food</option>
+            <option value="Water">Water</option>
+            <option value="Medicine">Medicine</option>
+            <option value="Shelter">Shelter</option>
+          </select>
+        </div>
+        <div class="resq-table-wrapper">
+          <table class="resq-table">
+            <thead><tr>
+              <th>Request ID</th><th>Type</th><th>Priority</th>
+              <th>Status</th><th>Submitted</th><th>AI Result</th>
+            </tr></thead>
+            <tbody id="requests-tbody">
+              <tr><td colspan="6" style="text-align:center;padding:30px;color:var(--text-muted)">Loading...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Timeline -->
+      <div class="resq-card mb-20">
+        <div class="mb-16">
+          <h6 style="font-weight:700;margin:0">⏳ My Requests Timeline</h6>
+          <p style="color:var(--text-muted);font-size:0.8rem;margin:4px 0 0">Live progress of your submitted requests</p>
+        </div>
+        <div id="timeline-container" class="timeline-container">
+          <div style="text-align:center;padding:30px;color:var(--text-muted)">Loading timeline...</div>
+        </div>
+      </div>
+
+      <!-- My Disaster Reports -->
+      <div class="resq-card mb-20">
+        <div class="mb-16">
+          <h6 style="font-weight:700;margin:0">📢 My Disaster Reports</h6>
+          <p style="color:var(--text-muted);font-size:0.8rem;margin:4px 0 0">Disasters you have reported to the network</p>
+        </div>
+        <div class="resq-table-wrapper">
+          <table class="resq-table">
+            <thead><tr>
+              <th>Type</th><th>Severity</th><th>Location</th>
+              <th>AI Analysis</th><th>Submitted</th><th>Action</th>
+            </tr></thead>
+            <tbody id="disasters-tbody">
+              <tr><td colspan="6" style="text-align:center;padding:30px;color:var(--text-muted)">Loading...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- AI Results Panel -->
+      <div class="resq-card" id="profile-section">
+        <div class="flex items-center justify-between mb-20" style="flex-wrap:wrap;gap:10px">
+          <h6 style="font-weight:700;margin:0">🤖 AI Analysis Result</h6>
+          <span style="font-size:0.72rem;color:var(--text-muted)">Click "AI Result" on any request</span>
+        </div>
+        <div id="ai-result-panel" class="ai-panel">
+          <div class="ai-panel-title">🤖 AI ANALYSIS ENGINE</div>
+          <div style="text-align:center;padding:20px;color:var(--text-muted);font-size:0.875rem">
+            Select a request above to view AI analysis
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right: Profile + Quick Actions + Emergency -->
+    <div>
+      <!-- Profile Card -->
+      <div class="profile-card mb-20">
+        <div class="profile-cover">
+          <div class="profile-cover-pattern"></div>
+        </div>
+        <div class="profile-avatar-wrap">
+          <div class="profile-avatar" id="profile-avatar">U</div>
+        </div>
+        <div class="profile-info">
+          <div class="profile-name" id="profile-name">Loading...</div>
+          <span class="profile-role reporter">Disaster Reporter</span>
+          <div class="profile-details">
+            <div class="profile-detail-row">
+              <span class="profile-detail-icon">📧</span>
+              <span class="profile-detail-label">Email</span>
+              <span class="profile-detail-value profile-email">—</span>
+            </div>
+            <div class="profile-detail-row">
+              <span class="profile-detail-icon">📞</span>
+              <span class="profile-detail-label">Phone</span>
+              <span class="profile-detail-value profile-phone">—</span>
+            </div>
+            <div class="profile-detail-row">
+              <span class="profile-detail-icon">📅</span>
+              <span class="profile-detail-label">Member since</span>
+              <span class="profile-detail-value">June 2024</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Quick Actions -->
+      <div class="resq-card mb-20">
+        <h6 style="font-weight:700;margin-bottom:14px">Quick Actions</h6>
+        <div class="quick-action-grid">
+          <a href="help-request.html" class="quick-action">
+            <div class="quick-action-icon">🆘</div>
+            <div class="quick-action-text">Request Help</div>
+          </a>
+          <a href="report-disaster.html" class="quick-action">
+            <div class="quick-action-icon">📢</div>
+            <div class="quick-action-text">Report Disaster</div>
+          </a>
+          <a href="map.html" class="quick-action">
+            <div class="quick-action-icon">🗺️</div>
+            <div class="quick-action-text">View Map</div>
+          </a>
+          <a href="#" class="quick-action" onclick="handleLogout(); return false;">
+            <div class="quick-action-icon">🚪</div>
+            <div class="quick-action-text">Logout</div>
+          </a>
+        </div>
+      </div>
+
+      <!-- Emergency Numbers -->
+      <div class="resq-card">
+        <h6 style="font-weight:700;margin-bottom:14px">📞 Emergency Contacts</h6>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <a href="tel:112"  class="emergency-link red"   ><span>🚨 ERSS (All)</span><strong class="red">112</strong></a>
+          <a href="tel:100"  class="emergency-link blue"  ><span>🚓 Police</span><strong class="blue">100</strong></a>
+          <a href="tel:101"  class="emergency-link amber" ><span>🚒 Fire</span><strong class="amber">101</strong></a>
+          <a href="tel:108"  class="emergency-link green" ><span>🚑 Ambulance</span><strong class="green">108</strong></a>
+          <a href="tel:1078" class="emergency-link purple"><span>🏛️ Disaster Mgmt</span><strong class="purple">1078</strong></a>
+          <a href="tel:1091" class="emergency-link pink"  ><span>👩 Women Helpline</span><strong style="color:#EC4899">1091</strong></a>
+          <a href="tel:1098" class="emergency-link blue"  ><span>👧 Child Helpline</span><strong class="blue">1098</strong></a>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<!-- Floating Action Button -->
+<a href="help-request.html" style="
+  position:fixed; bottom:80px; right:20px; z-index:201;
+  width:56px; height:56px; border-radius:50%;
+  background:var(--grad-primary); color:#fff;
+  display:flex; align-items:center; justify-content:center;
+  font-size:1.4rem; text-decoration:none;
+  box-shadow:var(--glow-red); transition:var(--transition);
+  animation:glowPulse 2s ease-in-out infinite;
+" title="New Help Request">🆘</a>
+
+<button class="sidebar-toggle" id="sidebar-toggle-btn">☰</button>
+<div id="toast-container"></div>
+
+<script src="js/api.js"></script>
+<script src="js/main.js"></script>
+<script src="js/user-dashboard.js"></script>
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    const user = Session.get();
+    if (!user) return;
+    const initials = user.name.split(' ').map(n=>n[0]).join('').toUpperCase().slice(0,2);
+    const pav = document.getElementById('profile-avatar');
+    if (pav) pav.textContent = initials;
+  });
+</script>
+</body>
+</html>
+
+

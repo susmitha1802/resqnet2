@@ -1,0 +1,35 @@
+# Review-only deployment configuration. Applying this creates paid disk resources.
+services:
+  - type: web
+    name: resqnet-backend
+    runtime: python
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn --bind 0.0.0.0:$PORT --workers 1 --threads 4 wsgi:application
+    healthCheckPath: /health
+    plan: starter
+    disk:
+      name: resqnet-private-data
+      mountPath: /var/data/resqnet
+      sizeGB: 1
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.15
+      - key: APP_ENV
+        value: production
+      - key: FLASK_DEBUG
+        value: "False"
+      - key: SEED_DEMO_DATA
+        value: "False"
+      - key: SECRET_KEY
+        generateValue: true
+      - key: JWT_SECRET_KEY
+        generateValue: true
+      - key: DATABASE_URL
+        value: sqlite:////var/data/resqnet/resqnet.db
+      - key: PERSISTENT_STORAGE_PATH
+        value: /var/data/resqnet
+      - key: UPLOAD_FOLDER
+        value: /var/data/resqnet/uploads
+      - key: CORS_ORIGINS
+        value: https://resqnet1-2026.netlify.app

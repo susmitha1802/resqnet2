@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+  <title>ResQNet — Volunteer Dashboard</title>
+  <link href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" rel="stylesheet" />
+  <link href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" rel="stylesheet" />
+  <link href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" rel="stylesheet" />
+  <link href="css/styles.css" rel="stylesheet" />
+  <style>
+    .request-card {
+      border: 1px solid var(--border-glass);
+      border-radius: var(--radius);
+      padding: 16px;
+      margin-bottom: 12px;
+      background: var(--bg-card-2);
+      transition: border-color 0.2s;
+    }
+
+    .request-card:hover {
+      border-color: var(--accent-red);
+    }
+
+    .request-card.high {
+      border-left: 3px solid #ef4444;
+    }
+
+    .request-card.medium {
+      border-left: 3px solid #f59e0b;
+    }
+
+    .request-card.low {
+      border-left: 3px solid #10b981;
+    }
+
+    .request-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+
+    .request-card-title {
+      font-weight: 700;
+      font-size: 1rem;
+    }
+
+    .request-card-meta {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      display: flex;
+      gap: 16px;
+      margin-bottom: 10px;
+    }
+
+    .request-card-desc {
+      font-size: 0.85rem;
+      color: var(--text-secondary);
+      margin-bottom: 12px;
+    }
+
+    .request-card-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .vol-grid {
+      display: grid;
+      grid-template-columns: 1fr 340px;
+      gap: 20px;
+    }
+
+    .ping-banner {
+      background: rgba(239, 68, 68, 0.1);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+      border-radius: var(--radius);
+      padding: 16px;
+      margin-bottom: 20px;
+    }
+
+    @media(max-width:900px) {
+      .vol-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+
+<body class="dashboard-page">
+
+  <!-- SIDEBAR -->
+  <aside class="resq-sidebar" id="resq-sidebar">
+    <a class="sidebar-logo" href="index.html">
+      <div class="brand-icon">🚨</div>
+      <span class="brand-name">Res<span>Q</span>Net</span>
+    </a>
+    <nav class="sidebar-nav">
+      <div class="sidebar-section-title">Volunteer</div>
+      <a class="sidebar-nav-item active" href="volunteer-dashboard.html"><span class="nav-icon">📊</span> Dashboard</a>
+      <a class="sidebar-nav-item" href="map.html"><span class="nav-icon">🗺️</span> Live Map</a>
+      <div class="sidebar-section-title" style="margin-top:10px">Account</div>
+      <a class="sidebar-nav-item" href="#" onclick="handleLogout(); return false;"><span class="nav-icon">🚪</span>
+        Logout</a>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="sidebar-user">
+        <div class="sidebar-avatar" id="sidebar-avatar" style="background:var(--grad-primary)">V</div>
+        <div>
+          <div class="sidebar-user-name" id="sidebar-username">Loading...</div>
+          <div class="sidebar-user-role">Volunteer</div>
+        </div>
+      </div>
+    </div>
+  </aside>
+  <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+  <!-- MAIN CONTENT -->
+  <main class="dashboard-content">
+
+    <!-- HEADER -->
+    <div class="dashboard-header"
+      style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;">
+      <div>
+        <div class="dashboard-title">Volunteer Dashboard</div>
+        <div class="dashboard-subtitle">Manage nearby requests and track your contributions</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px;">
+        <span id="eoc-clock" style="color:var(--text-muted);font-size:0.82rem;"></span>
+        <a class="btn btn-primary btn-sm" href="map.html">🗺️ Open Map</a>
+      </div>
+    </div>
+
+    <!-- PREPAREDNESS PING BANNER (shown when there's an alert for this volunteer) -->
+    <div id="ping-banner" style="display:none;" class="ping-banner">
+      <div style="font-weight:700;font-size:1rem;color:#ef4444;margin-bottom:8px;">🔔 Preparedness Alert</div>
+      <div id="ping-description" style="color:var(--text-secondary);margin-bottom:12px;">A weather alert has been issued
+        for your area. Please confirm your availability.</div>
+      <div style="display:flex;gap:10px;">
+        <button class="btn-resq" onclick="respondToPing('Acknowledged')" style="padding:8px 20px;">✓ I'm Ready &amp;
+          Available</button>
+        <button class="btn-resq-outline" onclick="respondToPing('Unavailable')" style="padding:8px 20px;">✗ Unavailable
+          Right Now</button>
+      </div>
+    </div>
+
+    <!-- STATS ROW -->
+    <div class="stats-grid-4 mb-24">
+      <div class="stat-card info">
+        <div class="stat-icon info">📍</div>
+        <div>
+          <div class="stat-value" id="stat-nearby">0</div>
+          <div class="stat-label">Nearby Requests</div>
+        </div>
+      </div>
+      <div class="stat-card danger">
+        <div class="stat-icon danger">🚨</div>
+        <div>
+          <div class="stat-value" id="stat-high">0</div>
+          <div class="stat-label">High Priority</div>
+        </div>
+      </div>
+      <div class="stat-card warning">
+        <div class="stat-icon warning">✅</div>
+        <div>
+          <div class="stat-value" id="stat-accepted">0</div>
+          <div class="stat-label">Tasks Accepted</div>
+        </div>
+      </div>
+      <div class="stat-card success">
+        <div class="stat-icon success">🎯</div>
+        <div>
+          <div class="stat-value" id="stat-completed">0</div>
+          <div class="stat-label">Completed Tasks</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- MAIN GRID: left=requests, right=profile+map+contacts -->
+    <div class="vol-grid">
+
+      <!-- LEFT COLUMN -->
+      <div>
+        <!-- Weather Alert strip -->
+        <div id="vol-weather-alert"
+          style="display:none;background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.3);border-radius:var(--radius);padding:12px 16px;margin-bottom:16px;font-size:0.88rem;color:#f59e0b;">
+          ⚠ <span id="vol-alert-text">Weather alert active in your area</span>
+        </div>
+
+        <!-- Availability toggle -->
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+          <div style="font-weight:600;font-size:0.9rem;">My Availability</div>
+          <select class="resq-select" id="vol-status-select" onchange="updateVolunteerStatusSelect(this)"
+            style="width:auto;min-width:180px;">
+            <option value="available">🟢 Ready (Available)</option>
+            <option value="on_task">🟡 On Task</option>
+            <option value="unavailable">⚪ Unavailable</option>
+          </select>
+        </div>
+
+        <!-- Filter bar -->
+        <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;">
+          <input class="resq-input" id="search-input" placeholder="🔍 Search location or type..." type="text"
+            style="flex:1;min-width:180px;" />
+          <select class="resq-select" id="priority-filter" style="width:auto;min-width:130px;">
+            <option value="">All Priorities</option>
+            <option value="High">🔴 High</option>
+            <option value="Medium">🟡 Medium</option>
+            <option value="Low">🟢 Low</option>
+          </select>
+          <select class="resq-select" id="type-filter" style="width:auto;min-width:120px;">
+            <option value="">All Types</option>
+            <option value="Rescue">🚁 Rescue</option>
+            <option value="Food">🍱 Food</option>
+            <option value="Water">💧 Water</option>
+            <option value="Medicine">💊 Medicine</option>
+            <option value="Shelter">🏠 Shelter</option>
+          </select>
+        </div>
+
+        <!-- Nearby requests list -->
+        <div
+          style="font-weight:700;font-size:0.78rem;letter-spacing:0.05em;color:var(--text-muted);text-transform:uppercase;margin-bottom:12px;">
+          Nearby Help Requests — Sorted by Priority</div>
+        <div id="nearby-requests">
+          <div style="text-align:center;padding:40px;color:var(--text-muted);">Loading nearby requests...</div>
+        </div>
+
+        <!-- Task History -->
+        <div class="resq-card" style="margin-top:24px;">
+          <div style="font-weight:700;margin-bottom:16px;">📋 My Task History</div>
+          <div class="resq-table-wrapper">
+            <table class="resq-table">
+              <thead>
+                <tr>
+                  <th>Task ID</th>
+                  <th>Type</th>
+                  <th>Location</th>
+                  <th>Status</th>
+                  <th>Assigned</th>
+                </tr>
+              </thead>
+              <tbody id="tasks-tbody">
+                <tr>
+                  <td colspan="5" style="text-align:center;padding:20px;color:var(--text-muted);">Loading...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- RIGHT COLUMN -->
+      <div style="display:flex;flex-direction:column;gap:16px;">
+
+        <!-- Profile Card -->
+        <div class="resq-card">
+          <div
+            style="background:linear-gradient(135deg,#00e676,#00b248);height:60px;border-radius:var(--radius-sm);margin:-16px -16px 0 -16px;">
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:center;padding-top:8px;text-align:center;">
+            <div id="vol-avatar"
+              style="width:56px;height:56px;border-radius:50%;background:linear-gradient(135deg,#00e676,#00b248);display:flex;align-items:center;justify-content:center;font-size:1.4rem;font-weight:700;color:#fff;margin-top:-28px;border:3px solid var(--bg-card);">
+              V</div>
+            <div id="profile-name" style="font-weight:700;font-size:1rem;margin-top:8px;">Loading...</div>
+            <span class="profile-role volunteer" style="margin-top:4px;">Volunteer</span>
+            <div style="width:100%;margin-top:12px;display:flex;flex-direction:column;gap:6px;text-align:left;">
+              <div style="display:flex;justify-content:space-between;font-size:0.82rem;"><span
+                  style="color:var(--text-muted);">📧 Email</span><span class="profile-email"
+                  style="color:var(--text-secondary);">—</span></div>
+              <div style="display:flex;justify-content:space-between;font-size:0.82rem;"><span
+                  style="color:var(--text-muted);">📞 Phone</span><span class="profile-phone"
+                  style="color:var(--text-secondary);">—</span></div>
+              <div style="display:flex;justify-content:space-between;font-size:0.82rem;"><span
+                  style="color:var(--text-muted);">🏅 Tasks Done</span><span id="profile-tasks-done"
+                  style="color:var(--accent-green);font-weight:600;">—</span></div>
+            </div>
+            <button class="btn-resq-outline" style="width:100%;margin-top:12px;padding:8px;"
+              onclick="updateLocationManually()">📍 Update My Location</button>
+          </div>
+        </div>
+
+        <!-- Live Map -->
+        <div class="resq-card">
+          <div style="font-weight:700;font-size:0.875rem;margin-bottom:8px;">🗺️ Live Operations Map</div>
+          <div id="map"
+            style="height:260px;border-radius:var(--radius-sm);overflow:hidden;border:1px solid var(--border-subtle);">
+          </div>
+        </div>
+
+        <!-- Emergency Contacts -->
+        <div class="resq-card">
+          <div style="font-weight:700;margin-bottom:12px;">📞 Emergency Contacts</div>
+          <div style="display:flex;flex-direction:column;gap:6px;">
+            <a class="emergency-link red" href="tel:112"><span>🚨 ERSS (All)</span><strong class="red">112</strong></a>
+            <a class="emergency-link blue" href="tel:100"><span>🚓 Police</span><strong class="blue">100</strong></a>
+            <a class="emergency-link amber" href="tel:101"><span>🚒 Fire</span><strong class="amber">101</strong></a>
+            <a class="emergency-link green" href="tel:108"><span>🚑 Ambulance</span><strong
+                class="green">108</strong></a>
+            <a class="emergency-link purple" href="tel:1078"><span>🏛️ Disaster Mgmt</span><strong
+                class="purple">1078</strong></a>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+  </main>
+
+  <button class="sidebar-toggle" id="sidebar-toggle-btn">☰</button>
+  <div id="toast-container"></div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/main.js"></script>
+  <script src="js/leaflet-map.js"></script>
+  <script src="js/volunteer-dashboard.js"></script>
+
+  <script>
+    /* Clock */
+    function startClock() {
+      const el = document.getElementById('eoc-clock');
+      if (!el) return;
+      const update = () => {
+        el.textContent = new Date().toLocaleString('en-IN', {
+          weekday: 'short', day: '2-digit', month: 'short',
+          hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true
+        });
+      };
+      update(); setInterval(update, 1000);
+    }
+
+    /* Ping banner */
+    let currentPingId = null;
+    async function loadMyPings() {
+      const token = Session.getToken();
+      try {
+        const res = await fetch(`${API_BASE}/preparedness/my-pings`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data = await res.json();
+        const pings = (data.pings || []).filter(p => p.status === 'Sent');
+        if (pings.length > 0) {
+          currentPingId = pings[0].ping_id;
+          document.getElementById('ping-banner').style.display = 'block';
+        }
+      } catch (e) { }
+    }
+
+    async function respondToPing(status) {
+      if (!currentPingId) return;
+      const token = Session.getToken();
+      try {
+        await fetch(`${API_BASE}/preparedness/ping/${currentPingId}`, {
+          method: 'PUT',
+          headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status })
+        });
+        document.getElementById('ping-banner').style.display = 'none';
+        Toast.show(status === 'Acknowledged' ? '✅ Marked as Ready!' : 'Status updated', 'success');
+      } catch (e) {
+        Toast.show('Failed to update status', 'danger');
+      }
+    }
+
+    /* Weather alerts */
+    async function loadVolAlerts() {
+      const token = Session.getToken();
+      try {
+        const res = await fetch(`${API_BASE}/alerts`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data = await res.json();
+        const alerts = data.alerts || [];
+        if (alerts.length > 0) {
+          const a = alerts[0];
+          document.getElementById('vol-weather-alert').style.display = 'block';
+          document.getElementById('vol-alert-text').textContent = `${a.alert_type} ${a.severity} — ${a.description}`;
+        }
+      } catch (e) { }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      startClock();
+      const user = Session.get();
+      if (user) {
+        const initials = user.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+        const av = document.getElementById('vol-avatar');
+        const sav = document.getElementById('sidebar-avatar');
+        if (av) av.textContent = initials;
+        if (sav) sav.textContent = initials;
+        const sun = document.getElementById('sidebar-username');
+        if (sun) sun.textContent = user.name;
+      }
+      loadMyPings();
+      loadVolAlerts();
+    });
+
+    window.addEventListener('DOMContentLoaded', async () => {
+      const mapEl = document.getElementById('map');
+      if (mapEl && typeof ResQMap !== 'undefined') {
+        await ResQMap.setupOperationalMap('map', 'volunteer');
+      }
+    });
+  </script>
+</body>
+
+</html>

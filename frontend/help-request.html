@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ResQNet — Request Help</title>
+  <meta name="description" content="Submit a help request for food, water, rescue, medicine, or shelter on ResQNet.">
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+</head>
+<body style="background:var(--bg-primary)">
+
+<!-- Top bar -->
+<div style="background:var(--bg-card);border-bottom:1px solid var(--border-subtle);padding:12px 20px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100">
+  <a href="index.html" style="display:flex;align-items:center;gap:10px;text-decoration:none">
+    <div style="width:32px;height:32px;border-radius:var(--radius-sm);background:var(--grad-primary);display:flex;align-items:center;justify-content:center;font-size:0.85rem;box-shadow:var(--glow-red-sm)">🚨</div>
+    <span style="font-family:'Space Grotesk',sans-serif;font-weight:800;font-size:1.05rem;color:var(--text-primary)">Res<span style="color:var(--accent-red)">Q</span>Net</span>
+  </a>
+  <a href="user-dashboard.html" style="color:var(--text-secondary);text-decoration:none;font-size:0.875rem;transition:var(--transition-sm)" onmouseover="this.style.color='var(--accent-red)'" onmouseout="this.style.color='var(--text-secondary)'">← Back to Dashboard</a>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 340px;gap:24px;max-width:1200px;margin:0 auto;padding:36px 20px">
+
+  <!-- Main Form -->
+  <div>
+    <!-- Header -->
+    <div style="margin-bottom:24px">
+      <h3 style="font-weight:800;margin-bottom:6px">🆘 Request Emergency Help</h3>
+      <p style="color:var(--text-secondary);font-size:0.875rem">Fill in the details below. Our AI will immediately assess the priority and assign volunteers.</p>
+    </div>
+
+    <!-- Success State -->
+    <div class="success-state" id="success-state">
+      <div style="font-size:5rem;animation:float 3s ease-in-out infinite">🎯</div>
+      <h3 style="font-weight:800;margin-bottom:12px">Request Submitted!</h3>
+      <p style="color:var(--text-secondary);max-width:380px;margin-bottom:12px">Your help request has been submitted successfully. Priority level assigned:</p>
+      <div style="margin-bottom:24px"><span id="success-priority" class="badge badge-high" style="font-size:0.9rem;padding:6px 18px">—</span></div>
+      <p style="color:var(--text-secondary);font-size:0.85rem;max-width:380px;margin-bottom:28px">Nearby volunteers are being notified. You should hear back within minutes for high-priority requests.</p>
+      <div class="flex gap-12" style="flex-wrap:wrap;justify-content:center">
+        <a href="user-dashboard.html" class="btn btn-primary">📊 Track My Request</a>
+        <a href="map.html" class="btn btn-outline" id="success-map-link">🗺️ View on Map</a>
+      </div>
+    </div>
+
+    <form id="help-form">
+      <!-- Personal Info -->
+      <div class="resq-card mb-20">
+        <h6 style="font-weight:700;margin-bottom:14px">👤 Your Information</h6>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+          <div class="resq-form-group">
+            <label class="resq-label">Full Name *</label>
+            <div class="input-with-icon">
+              <span class="input-icon">👤</span>
+              <input type="text" class="resq-input" id="req-name" placeholder="Your full name" required>
+            </div>
+          </div>
+          <div class="resq-form-group">
+            <label class="resq-label">Contact Number *</label>
+            <div class="input-with-icon">
+              <span class="input-icon">📞</span>
+              <input type="tel" class="resq-input" id="req-contact" placeholder="+91 98765 43210" required>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Request Type -->
+      <div class="resq-card mb-20">
+        <h6 style="font-weight:700;margin-bottom:4px">Type of Help Required *</h6>
+        <p style="color:var(--text-muted);font-size:0.8rem;margin-bottom:14px">Select the primary resource or assistance you need</p>
+        <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:16px">
+          <div class="type-card" onclick="selectType('Food')"><span class="type-icon">🍱</span><div class="type-name">Food</div></div>
+          <div class="type-card" onclick="selectType('Water')"><span class="type-icon">💧</span><div class="type-name">Water</div></div>
+          <div class="type-card" onclick="selectType('Medicine')"><span class="type-icon">💊</span><div class="type-name">Medicine</div></div>
+          <div class="type-card" onclick="selectType('Rescue')"><span class="type-icon">🚁</span><div class="type-name">Rescue</div></div>
+          <div class="type-card" onclick="selectType('Shelter')"><span class="type-icon">🏠</span><div class="type-name">Shelter</div></div>
+        </div>
+        <select class="resq-select" id="request-type" required style="display:none">
+          <option value="">Select type</option>
+          <option value="Food">Food</option>
+          <option value="Water">Water</option>
+          <option value="Medicine">Medicine</option>
+          <option value="Rescue">Rescue</option>
+          <option value="Shelter">Shelter</option>
+        </select>
+        <div style="display:grid;grid-template-columns:1fr 2fr;gap:14px;margin-top:14px">
+          <div class="resq-form-group">
+            <label class="resq-label">Number of People Affected *</label>
+            <input type="number" class="resq-input" id="people-count" placeholder="e.g. 5" min="1" required>
+          </div>
+          <div class="resq-form-group">
+            <label class="resq-label">Additional Details</label>
+            <textarea class="resq-textarea" id="req-description" placeholder="Describe your situation in detail..." rows="3" style="min-height:52px"></textarea>
+          </div>
+        </div>
+      </div>
+
+      <!-- Image Upload -->
+      <div class="resq-card mb-20">
+        <h6 style="font-weight:700;margin-bottom:4px">📸 Upload Situation Image (Optional)</h6>
+        <p style="color:var(--text-muted);font-size:0.8rem;margin-bottom:14px">AI will analyze the image for damage severity classification</p>
+        <div class="file-upload-area" id="img-drop-area" onclick="document.getElementById('img-input').click()">
+          <div class="file-upload-icon">🖼️</div>
+          <div class="file-upload-text">Drag image here or <span>Browse</span></div>
+          <div style="color:var(--text-muted);font-size:0.72rem;margin-top:4px">JPG, PNG — Max 10MB</div>
+        </div>
+        <input type="file" id="img-input" accept="image/*" style="display:none">
+        <div id="img-preview" style="margin-top:10px;display:none"></div>
+      </div>
+
+      <!-- Location -->
+      <div class="resq-card mb-20">
+        <h6 style="font-weight:700;margin-bottom:4px">📍 Your Location *
+          <span style="color:var(--text-muted);font-weight:400;font-size:0.72rem">(click map or use button)</span>
+        </h6>
+        <p style="color:var(--text-muted);font-size:0.8rem;margin-bottom:12px">We need your location to connect you with the nearest volunteers</p>
+        <!-- Address search -->
+        <div style="position:relative;margin-bottom:10px">
+          <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--text-muted);pointer-events:none">🔍</span>
+          <input id="loc-search-input" class="resq-input" placeholder="Search address…" autocomplete="off" style="padding-left:36px">
+          <div id="loc-search-results" style="display:none;position:absolute;top:calc(100% + 6px);left:0;right:0;background:var(--bg-card);border:1px solid rgba(255,45,85,0.2);border-radius:var(--radius-sm);z-index:1000;max-height:200px;overflow-y:auto;box-shadow:var(--shadow-lg)"></div>
+        </div>
+        <!-- Map -->
+        <div id="location-picker-map" style="position:relative;isolation:isolate;height:300px;border-radius:var(--radius);overflow:hidden;border:1px solid var(--border-subtle);margin-bottom:10px"></div>
+        <div class="flex gap-10 items-center" style="flex-wrap:wrap">
+          <button type="button" class="btn btn-primary btn-sm" id="get-location-btn">
+            📍 Detect Location
+          </button>
+          <div style="flex:1;min-width:180px">
+            <div id="location-display" style="color:var(--text-muted);font-size:0.875rem;padding:10px 14px;background:var(--bg-card-2);border-radius:var(--radius-sm);border:1px solid var(--border-subtle)">
+              Click map or detect location
+            </div>
+          </div>
+        </div>
+        <input type="hidden" id="lat-input">
+        <input type="hidden" id="lng-input">
+      </div>
+
+      <!-- Submit -->
+      <div class="flex gap-12" style="flex-wrap:wrap">
+        <button type="submit" class="btn btn-primary btn-lg animate-glow" id="submit-btn">
+          🆘 Submit Help Request
+        </button>
+        <a href="user-dashboard.html" class="btn btn-ghost btn-lg">Cancel</a>
+      </div>
+    </form>
+  </div>
+
+  <!-- Sidebar: AI Preview + Info Cards -->
+  <div style="position:sticky;top:74px;height:fit-content">
+    <!-- AI Preview Panel -->
+    <div id="ai-preview-panel" style="display:none;margin-bottom:18px">
+      <div class="ai-panel">
+        <div class="ai-panel-title">🤖 AI PREVIEW</div>
+        <div class="ai-metric">
+          <span class="ai-metric-label">🚨 Predicted Priority</span>
+          <span class="ai-metric-value" id="ai-priority-level" style="font-size:1rem;font-weight:800">—</span>
+        </div>
+        <div style="color:var(--text-muted);font-size:0.75rem;margin:6px 0 14px;padding:8px;background:rgba(255,255,255,0.03);border-radius:var(--radius-sm)" id="ai-priority-reason"></div>
+        <div class="ai-panel-title" style="margin-top:6px">📦 Resource Forecast</div>
+        <div class="ai-metric">
+          <span class="ai-metric-label">🍱 Food</span>
+          <span class="ai-metric-value" id="ai-food-forecast" style="font-size:0.8rem">—</span>
+        </div>
+        <div class="ai-metric">
+          <span class="ai-metric-label">💧 Water</span>
+          <span class="ai-metric-value" id="ai-water-forecast" style="font-size:0.8rem">—</span>
+        </div>
+        <div class="ai-metric">
+          <span class="ai-metric-label">💊 Medical</span>
+          <span class="ai-metric-value" id="ai-medical-forecast" style="font-size:0.8rem">—</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Priority Rules -->
+    <div class="resq-card mb-16">
+      <div style="font-weight:700;margin-bottom:12px;font-size:0.875rem">⚡ Priority Rules</div>
+      <div style="font-size:0.8rem;display:flex;flex-direction:column;gap:8px">
+        <div class="flex items-center gap-8">
+          <span class="badge badge-high">High</span>
+          <span style="color:var(--text-secondary)">Rescue, Medical, or 10+ people</span>
+        </div>
+        <div class="flex items-center gap-8">
+          <span class="badge badge-medium">Medium</span>
+          <span style="color:var(--text-secondary)">Food or Water shortages</span>
+        </div>
+        <div class="flex items-center gap-8">
+          <span class="badge badge-low">Low</span>
+          <span style="color:var(--text-secondary)">General assistance needs</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Emergency Contacts -->
+    <div class="resq-card mb-16">
+      <div style="font-weight:700;margin-bottom:12px;font-size:0.875rem">📞 Emergency Contacts</div>
+      <div style="display:flex;flex-direction:column;gap:6px">
+        <a href="tel:112"  class="emergency-link red"   ><span>🚨 ERSS (All)</span><strong class="red">112</strong></a>
+        <a href="tel:100"  class="emergency-link blue"  ><span>🚓 Police</span><strong class="blue">100</strong></a>
+        <a href="tel:101"  class="emergency-link amber" ><span>🚒 Fire</span><strong class="amber">101</strong></a>
+        <a href="tel:108"  class="emergency-link green" ><span>🚑 Ambulance</span><strong class="green">108</strong></a>
+        <a href="tel:1078" class="emergency-link purple"><span>🏛️ NDRF</span><strong class="purple">1078</strong></a>
+      </div>
+    </div>
+
+    <div class="resq-alert info">
+      ℹ️ <span>High Priority requests are responded to within <strong>15 minutes</strong> on average.</span>
+    </div>
+  </div>
+
+</div>
+
+<div id="toast-container"></div>
+
+<!-- Responsive: stack on mobile -->
+<style>
+  @media (max-width: 900px) {
+    div[style*="grid-template-columns:1fr 340px"] { grid-template-columns: 1fr !important; }
+    div[style*="position:sticky;top:74px"] { position: static !important; }
+    div[style*="grid-template-columns:repeat(5,1fr)"] { grid-template-columns: repeat(3, 1fr) !important; }
+  }
+  @media (max-width: 600px) {
+    div[style*="grid-template-columns:1fr 1fr"] { grid-template-columns: 1fr !important; }
+    div[style*="grid-template-columns:1fr 2fr"] { grid-template-columns: 1fr !important; }
+  }
+</style>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="js/api.js"></script>
+<script src="js/main.js"></script>
+<script src="js/leaflet-map.js?v=location-1"></script>
+<script src="js/help-request.js?v=location-1"></script>
+<script>
+  function selectType(type) {
+    document.querySelectorAll('.type-card').forEach(c => c.classList.remove('selected'));
+    event.currentTarget.classList.add('selected');
+    const sel = document.getElementById('request-type');
+    sel.value = type;
+    sel.dispatchEvent(new Event('change'));
+  }
+</script>
+</body>
+</html>
+
+

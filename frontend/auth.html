@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ResQNet — Sign In or Register</title>
+  <meta name="description" content="Sign in or create your ResQNet account as a reporter, volunteer, NGO, or admin.">
+  <link rel="stylesheet" href="css/styles.css">
+  <style>
+    /* Auth page full-screen */
+    html,
+    body {
+      height: 100%;
+      overflow: hidden;
+    }
+
+    .auth-page {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      height: 100vh;
+    }
+
+    /* ── Left Brand Panel ── */
+    .auth-brand-panel {
+      background: var(--bg-secondary);
+      border-right: 1px solid var(--border-subtle);
+      display: flex;
+      flex-direction: column;
+      padding: 48px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* Animated grid bg */
+    .auth-brand-panel::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(255, 45, 85, 0.05) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 45, 85, 0.05) 1px, transparent 1px);
+      background-size: 48px 48px;
+    }
+
+    /* Neon orb */
+    .auth-brand-panel::after {
+      content: '';
+      position: absolute;
+      width: 500px;
+      height: 500px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(255, 45, 85, 0.18) 0%, transparent 60%);
+      bottom: -200px;
+      right: -100px;
+      pointer-events: none;
+    }
+
+    .auth-brand-content {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+    }
+
+    .auth-logo-wrap {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 48px;
+    }
+
+    .auth-logo-icon {
+      width: 44px;
+      height: 44px;
+      background: var(--grad-primary);
+      border-radius: var(--radius-sm);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.3rem;
+      box-shadow: var(--glow-red);
+    }
+
+    .auth-logo-name {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 1.6rem;
+      font-weight: 800;
+      color: var(--text-primary);
+    }
+
+    .auth-logo-name span {
+      color: var(--accent-red);
+    }
+
+    .auth-hero-title {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: clamp(2rem, 3vw, 3rem);
+      font-weight: 800;
+      line-height: 1.15;
+      margin-bottom: 18px;
+    }
+
+    .auth-hero-title .hl {
+      color: var(--accent-red);
+    }
+
+    .auth-bullets {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      margin-bottom: 40px;
+    }
+
+    .auth-bullet {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      font-size: 0.875rem;
+      color: var(--text-secondary);
+    }
+
+    .auth-bullet-icon {
+      width: 28px;
+      height: 28px;
+      background: var(--bg-glass-strong);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-xs);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.85rem;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+
+    /* Rotating live stat */
+    .auth-stat-ticker {
+      margin-top: auto;
+      background: var(--bg-glass);
+      border: 1px solid rgba(255, 45, 85, 0.15);
+      border-radius: var(--radius-sm);
+      padding: 14px 18px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .ticker-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--accent-red);
+      box-shadow: 0 0 6px var(--accent-red);
+      animation: pulseRed 1.5s ease-in-out infinite;
+      flex-shrink: 0;
+    }
+
+    .ticker-text {
+      font-size: 0.82rem;
+      color: var(--text-secondary);
+    }
+
+    .ticker-text strong {
+      color: var(--text-primary);
+    }
+
+    /* ── Right Form Panel ── */
+    .auth-form-panel {
+      background: var(--bg-card);
+      overflow-y: auto;
+      max-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      padding: 40px 36px;
+    }
+
+    /* Role selector */
+    .role-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+
+    .role-card {
+      padding: 14px 12px;
+      border: 2px solid var(--border-subtle);
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      transition: var(--transition);
+      text-align: center;
+      background: var(--bg-card-2);
+      position: relative;
+    }
+
+    .role-card:hover {
+      border-color: rgba(255, 45, 85, 0.3);
+      background: rgba(255, 45, 85, 0.04);
+    }
+
+    .role-card.selected {
+      border-color: var(--accent-red);
+      background: rgba(255, 45, 85, 0.08);
+    }
+
+    .role-card.selected::after {
+      content: '✓';
+      position: absolute;
+      top: 6px;
+      right: 8px;
+      font-size: 0.65rem;
+      color: var(--accent-red);
+      font-weight: 700;
+    }
+
+    .role-card-icon {
+      font-size: 1.6rem;
+      margin-bottom: 6px;
+    }
+
+    .role-card-label {
+      font-size: 0.78rem;
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+
+    .role-card-desc {
+      font-size: 0.67rem;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    /* Auth tabs */
+    .auth-tabs {
+      display: flex;
+      gap: 4px;
+      background: var(--bg-card-2);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-sm);
+      padding: 3px;
+      margin-bottom: 22px;
+    }
+
+    .auth-tab-btn {
+      flex: 1;
+      padding: 9px;
+      border: none;
+      border-radius: 3px;
+      background: transparent;
+      color: var(--text-secondary);
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: var(--transition-sm);
+      font-family: 'Inter', sans-serif;
+    }
+
+    .auth-tab-btn.active {
+      background: var(--bg-card);
+      color: var(--text-primary);
+      box-shadow: var(--shadow-sm);
+    }
+
+    /* Conditional extras */
+    #volunteer-extras,
+    #ngo-extras,
+    #admin-extras {
+      display: none;
+    }
+
+    #volunteer-extras.show,
+    #ngo-extras.show,
+    #admin-extras.show {
+      display: block;
+    }
+
+    /* Skill chips in register */
+    #skills-grid.skills-grid {
+      margin-bottom: 4px;
+    }
+
+    @media (max-width: 900px) {
+
+      html,
+      body {
+        overflow: auto;
+      }
+
+      .auth-page {
+        grid-template-columns: 1fr;
+      }
+
+      .auth-brand-panel {
+        min-height: 280px;
+        padding: 28px 24px;
+      }
+
+      .auth-brand-panel::before,
+      .auth-brand-panel::after {
+        display: none;
+      }
+
+      .auth-bullets {
+        display: none;
+      }
+
+      .auth-stat-ticker {
+        display: none;
+      }
+
+      .auth-form-panel {
+        padding: 28px 24px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="auth-page">
+
+    <!-- ── LEFT: Brand Panel ── -->
+    <div class="auth-brand-panel">
+      <div class="auth-brand-content">
+        <a href="index.html" class="auth-logo-wrap" style="text-decoration:none">
+          <div class="auth-logo-icon">🚨</div>
+          <span class="auth-logo-name">Res<span>Q</span>Net</span>
+        </a>
+
+        <h1 class="auth-hero-title">
+          Disaster<br>Relief,<br><span class="hl">Coordinated.</span>
+        </h1>
+
+        <p style="color:var(--text-secondary);font-size:0.925rem;line-height:1.7;max-width:380px;margin-bottom:28px">
+          Join thousands of volunteers, NGOs, and communities using ResQNet to deliver faster, smarter disaster relief
+          across India.
+        </p>
+
+        <div class="auth-bullets">
+          <div class="auth-bullet">
+            <div class="auth-bullet-icon">🤖</div>
+            <div><strong style="color:var(--text-primary)">AI-Powered Prioritization</strong><br>Requests ranked by
+              severity automatically in milliseconds</div>
+          </div>
+          <div class="auth-bullet">
+            <div class="auth-bullet-icon">🗺️</div>
+            <div><strong style="color:var(--text-primary)">Real-Time Map</strong><br>See all active incidents and
+              volunteer positions live</div>
+          </div>
+          <div class="auth-bullet">
+            <div class="auth-bullet-icon">📦</div>
+            <div><strong style="color:var(--text-primary)">Resource Matching</strong><br>NGO inventory automatically
+              matched to active needs</div>
+          </div>
+          <div class="auth-bullet">
+            <div class="auth-bullet-icon">🔒</div>
+            <div><strong style="color:var(--text-primary)">Secure &amp; Private</strong><br>Your data is encrypted and
+              handled with care</div>
+          </div>
+        </div>
+
+        <!-- Live stat ticker -->
+        <div class="auth-stat-ticker">
+          <div class="ticker-dot"></div>
+          <div class="ticker-text" id="auth-ticker">
+            ResQNet is <strong>actively coordinating</strong> relief operations right now.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── RIGHT: Form Panel ── -->
+    <div class="auth-form-panel" id="auth-form-panel">
+
+      <!-- Auth Tabs -->
+      <div class="auth-tabs" id="auth-tabs">
+        <button class="auth-tab-btn active" id="tab-login" onclick="switchAuthTab('login')">Sign In</button>
+        <button class="auth-tab-btn" id="tab-register" onclick="switchAuthTab('register')">Register</button>
+      </div>
+
+      <!-- Alert area -->
+      <div id="auth-alert" class="resq-alert danger" style="display:none;margin-bottom:14px"></div>
+
+      <!-- ── LOGIN FORM ── -->
+      <div id="login-form-wrap">
+        <form id="login-form">
+          <div class="resq-form-group">
+            <label class="resq-label">Email Address</label>
+            <div class="input-with-icon">
+              <span class="input-icon">📧</span>
+              <input type="email" class="resq-input" id="login-email" placeholder="you@email.com" required
+                autocomplete="email">
+            </div>
+          </div>
+          <div class="resq-form-group">
+            <label class="resq-label">Password</label>
+            <div class="input-with-icon">
+              <span class="input-icon">🔒</span>
+              <input type="password" class="resq-input" id="login-password" placeholder="••••••••" required
+                autocomplete="current-password">
+              <span class="input-toggle" onclick="togglePassword('login-password', this)">👁️</span>
+            </div>
+          </div>
+          <button type="submit" class="btn btn-primary w-100 btn-lg" id="login-btn"
+            style="justify-content:center;margin-top:6px">
+            Sign In
+          </button>
+        </form>
+        <div style="text-align:center;margin-top:16px">
+          <span style="color:var(--text-muted);font-size:0.82rem">Don't have an account?</span>
+          <button onclick="switchAuthTab('register')"
+            style="background:none;border:none;color:var(--accent-blue);font-size:0.82rem;cursor:pointer;font-weight:600;padding:0 4px">Register</button>
+        </div>
+      </div>
+
+      <!-- ── REGISTER FORM ── -->
+      <div id="register-form-wrap" style="display:none">
+        <!-- Role Selector -->
+        <div style="margin-bottom:22px" id="role-selector-wrap">
+          <div class="label-upper mb-12">I am a...</div>
+          <div class="role-grid">
+            <div class="role-card selected" id="role-reporter" onclick="selectRole('reporter')">
+              <div class="role-card-icon">👤</div>
+              <div class="role-card-label">Reporter</div>
+              <div class="role-card-desc">Need help</div>
+            </div>
+            <div class="role-card" id="role-volunteer" onclick="selectRole('volunteer')">
+              <div class="role-card-icon">🤝</div>
+              <div class="role-card-label">Volunteer</div>
+              <div class="role-card-desc">Help out</div>
+            </div>
+            <div class="role-card" id="role-ngo" onclick="selectRole('ngo')">
+              <div class="role-card-icon">🏢</div>
+              <div class="role-card-label">NGO</div>
+              <div class="role-card-desc">Organization</div>
+            </div>
+            <div class="role-card" id="role-admin" onclick="selectRole('admin')">
+              <div class="role-card-icon">🛡️</div>
+              <div class="role-card-label">Admin</div>
+              <div class="role-card-desc">System admin</div>
+            </div>
+          </div>
+        </div>
+
+        <form id="register-form">
+          <div class="resq-form-group">
+            <label class="resq-label">Full Name *</label>
+            <div class="input-with-icon">
+              <span class="input-icon">👤</span>
+              <input type="text" class="resq-input" id="reg-name" placeholder="Your full name" required>
+            </div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+            <div class="resq-form-group">
+              <label class="resq-label">Phone Number</label>
+              <div class="input-with-icon">
+                <span class="input-icon">📞</span>
+                <input type="tel" class="resq-input" id="reg-phone" placeholder="+91...">
+              </div>
+            </div>
+            <div class="resq-form-group">
+              <label class="resq-label">Email Address *</label>
+              <div class="input-with-icon">
+                <span class="input-icon">📧</span>
+                <input type="email" class="resq-input" id="reg-email" placeholder="you@email.com" required>
+              </div>
+            </div>
+          </div>
+          <div class="resq-form-group">
+            <label class="resq-label">Password *</label>
+            <div class="input-with-icon">
+              <span class="input-icon">🔒</span>
+              <input type="password" class="resq-input" id="reg-password" placeholder="Min. 6 characters" required>
+              <span class="input-toggle" onclick="togglePassword('reg-password', this)">👁️</span>
+            </div>
+            <div class="password-strength">
+              <div class="strength-bar">
+                <div class="strength-segment" id="str-1"></div>
+                <div class="strength-segment" id="str-2"></div>
+                <div class="strength-segment" id="str-3"></div>
+                <div class="strength-segment" id="str-4"></div>
+              </div>
+              <div class="strength-text" id="strength-text">Enter a password</div>
+            </div>
+          </div>
+          <div class="resq-form-group">
+            <label class="resq-label">Confirm Password *</label>
+            <div class="input-with-icon">
+              <span class="input-icon">🔒</span>
+              <input type="password" class="resq-input" id="reg-confirm" placeholder="Repeat password" required>
+              <span class="input-toggle" onclick="togglePassword('reg-confirm', this)">👁️</span>
+            </div>
+          </div>
+
+          <!-- ── Volunteer Extras ── -->
+          <div id="volunteer-extras">
+            <div class="resq-divider"></div>
+            <div class="label-upper mb-12">Volunteer Details</div>
+            <div class="resq-form-group">
+              <label class="resq-label">Skills &amp; Expertise</label>
+              <div id="skills-grid" class="skills-grid mb-8">
+                <div class="skill-chip" data-skill="First Aid">🩺 First Aid</div>
+                <div class="skill-chip" data-skill="Search &amp; Rescue">🔍 Search &amp; Rescue</div>
+                <div class="skill-chip" data-skill="Medical">💊 Medical</div>
+                <div class="skill-chip" data-skill="Logistics">🚛 Logistics</div>
+                <div class="skill-chip" data-skill="Communication">📡 Communication</div>
+                <div class="skill-chip" data-skill="Counseling">💬 Counseling</div>
+                <div class="skill-chip" data-skill="Driving">🚗 Driving</div>
+                <div class="skill-chip" data-skill="Tech">💻 Tech</div>
+              </div>
+              <input type="hidden" id="reg-skills">
+            </div>
+            <div class="resq-form-group">
+              <label class="resq-label">Availability</label>
+              <select class="resq-select" id="reg-availability">
+                <option value="available">🟢 Available Now</option>
+                <option value="weekends">📅 Weekends Only</option>
+                <option value="on-call">📞 On-Call</option>
+                <option value="unavailable">🔴 Unavailable</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- ── NGO Extras ── -->
+          <div id="ngo-extras">
+            <div class="resq-divider"></div>
+            <div class="label-upper mb-12">Organization Details</div>
+            <div class="resq-form-group">
+              <label class="resq-label">Organization Name *</label>
+              <div class="input-with-icon">
+                <span class="input-icon">🏢</span>
+                <input type="text" class="resq-input" id="reg-org-name" placeholder="e.g. Hyderabad Relief Foundation">
+              </div>
+            </div>
+            <div class="resq-form-group">
+              <label class="resq-label">Registration Number</label>
+              <input type="text" class="resq-input" id="reg-reg-number" placeholder="NGO/FCRA registration number">
+            </div>
+          </div>
+
+          <!-- ── Admin Extras ── -->
+          <div id="admin-extras">
+            <div class="resq-divider"></div>
+            <div class="resq-alert warning mb-14" style="font-size:0.78rem">
+              🔒 Admin registration requires a secret code issued by ResQNet HQ.
+            </div>
+            <div class="resq-form-group">
+              <label class="resq-label">Admin Secret Code *</label>
+              <div class="input-with-icon">
+                <span class="input-icon">🛡️</span>
+                <input type="password" class="resq-input" id="admin-secret-code" placeholder="Enter admin code">
+              </div>
+            </div>
+          </div>
+
+          <button type="submit" class="btn btn-primary w-100 btn-lg" id="register-btn"
+            style="justify-content:center;margin-top:6px">
+            Create Account
+          </button>
+        </form>
+        <div style="text-align:center;margin-top:14px">
+          <span style="color:var(--text-muted);font-size:0.82rem">Already have an account?</span>
+          <button onclick="switchAuthTab('login')"
+            style="background:none;border:none;color:var(--accent-blue);font-size:0.82rem;cursor:pointer;font-weight:600;padding:0 4px">Sign
+            In</button>
+        </div>
+      </div>
+
+    </div><!-- /auth-form-panel -->
+  </div><!-- /auth-page -->
+
+  <div id="toast-container"></div>
+
+  <script src="js/api.js"></script>
+  <script src="js/main.js"></script>
+  <script src="js/auth.js?v=role-state-20261020"></script>
+  <script>
+    /* ── Tab Switcher ── */
+    function switchAuthTab(tab) {
+      const isLogin = tab === 'login';
+      document.getElementById('tab-login').classList.toggle('active', isLogin);
+      document.getElementById('tab-register').classList.toggle('active', !isLogin);
+      document.getElementById('login-form-wrap').style.display = isLogin ? 'block' : 'none';
+      document.getElementById('register-form-wrap').style.display = isLogin ? 'none' : 'block';
+      document.getElementById('auth-alert').style.display = 'none';
+    }
+
+    /* ── Role Selector ── */
+    let currentRole = 'reporter';
+    function selectRole(role) {
+      document.querySelectorAll('.role-card').forEach(c => c.classList.remove('selected'));
+      document.getElementById('role-' + role).classList.add('selected');
+      currentRole = role;
+
+      document.getElementById('volunteer-extras').classList.toggle('show', role === 'volunteer');
+      document.getElementById('ngo-extras').classList.toggle('show', role === 'ngo');
+      document.getElementById('admin-extras').classList.toggle('show', role === 'admin');
+
+      // Expose globally for auth.js
+      window.selectedRole = role;
+    }
+    window.selectedRole = 'reporter';
+
+    /* ── Password Visibility Toggle ── */
+    function togglePassword(inputId, icon) {
+      const input = document.getElementById(inputId);
+      if (input.type === 'password') { input.type = 'text'; icon.textContent = '🙈'; }
+      else { input.type = 'password'; icon.textContent = '👁️'; }
+    }
+
+    /* ── Live Stat Ticker ── */
+    const TICKERS = [
+      'ResQNet is <strong>actively coordinating</strong> relief operations right now.',
+      '<strong>1,200+</strong> people helped across India this month.',
+      '<strong>300+ volunteers</strong> are registered and ready to deploy.',
+      'Average High-Priority response time: <strong>under 15 minutes</strong>.',
+      'ResQNet covers <strong>5 disaster types</strong> across India.',
+    ];
+    let tickerIdx = 0;
+    setInterval(() => {
+      tickerIdx = (tickerIdx + 1) % TICKERS.length;
+      document.getElementById('auth-ticker').innerHTML = TICKERS[tickerIdx];
+    }, 4000);
+  </script>
+</body>
+
+</html>

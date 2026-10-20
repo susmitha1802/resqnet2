@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ResQNet — Report Disaster</title>
+  <meta name="description" content="Report a disaster incident with location, description, and images on ResQNet.">
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <style>
+    /* Progress bar across top */
+    .wizard-progress-bar {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 200;
+      height: 3px;
+      background: var(--bg-card-2);
+    }
+    .wizard-progress-fill {
+      height: 100%;
+      background: var(--grad-primary);
+      width: 25%;
+      transition: width 0.4s ease;
+      box-shadow: 0 0 8px var(--accent-red);
+    }
+    /* Override form-sidebar so it's visible on this page */
+    @media (max-width: 768px) {
+      .form-sidebar { display: none; }
+      .form-steps-compact { display: flex !important; }
+    }
+  </style>
+</head>
+<body style="background:var(--bg-primary)">
+
+<!-- Wizard Progress Bar -->
+<div class="wizard-progress-bar">
+  <div class="wizard-progress-fill" id="wizard-progress-fill"></div>
+</div>
+
+<div class="form-page" style="padding-top:3px">
+  <!-- Sidebar -->
+  <div class="form-sidebar">
+    <!-- Mobile compact stepper -->
+    <div class="form-steps-compact">
+      <div class="step-dot active" id="compact-dot-1">1</div>
+      <div class="step-line"></div>
+      <div class="step-dot" id="compact-dot-2">2</div>
+      <div class="step-line"></div>
+      <div class="step-dot" id="compact-dot-3">3</div>
+      <div class="step-line"></div>
+      <div class="step-dot" id="compact-dot-4">4</div>
+    </div>
+
+    <a href="index.html" style="display:flex;align-items:center;gap:10px;text-decoration:none;margin-bottom:28px">
+      <div style="width:32px;height:32px;border-radius:var(--radius-sm);background:var(--grad-primary);display:flex;align-items:center;justify-content:center;font-size:0.85rem;box-shadow:var(--glow-red-sm)">🚨</div>
+      <span style="font-family:'Space Grotesk',sans-serif;font-weight:800;font-size:1.05rem;color:var(--text-primary)">Res<span style="color:var(--accent-red)">Q</span>Net</span>
+    </a>
+
+    <div style="margin-bottom:28px">
+      <h5 style="font-weight:800;margin-bottom:6px">Report Disaster</h5>
+      <p style="color:var(--text-secondary);font-size:0.82rem;line-height:1.6">Quickly report a disaster incident with location and details so volunteers and agencies can respond.</p>
+    </div>
+
+    <!-- Steps -->
+    <div style="flex:1">
+      <div class="form-step">
+        <div class="form-step-num active" id="step-num-1">1</div>
+        <div>
+          <div class="form-step-title">Disaster Type</div>
+          <div class="form-step-desc">Select the type of disaster</div>
+        </div>
+      </div>
+      <div class="form-step">
+        <div class="form-step-num upcoming" id="step-num-2">2</div>
+        <div>
+          <div class="form-step-title">Description</div>
+          <div class="form-step-desc">Describe what happened</div>
+        </div>
+      </div>
+      <div class="form-step">
+        <div class="form-step-num upcoming" id="step-num-3">3</div>
+        <div>
+          <div class="form-step-title">Media &amp; Location</div>
+          <div class="form-step-desc">Add photos and GPS pin</div>
+        </div>
+      </div>
+      <div class="form-step">
+        <div class="form-step-num upcoming" id="step-num-4">4</div>
+        <div>
+          <div class="form-step-title">Submit</div>
+          <div class="form-step-desc">Review and submit report</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Warning -->
+    <div class="resq-alert danger" style="margin-top:auto">
+      🚨 <span><strong>Life-threatening emergency?</strong> Call 112 immediately.</span>
+    </div>
+  </div>
+
+  <!-- Main Form -->
+  <div class="form-main">
+    <div style="max-width:780px;margin:0 auto;width:100%">
+      <div class="flex items-center justify-between mb-32" style="flex-wrap:wrap;gap:12px">
+        <div>
+          <h4 style="font-weight:800;margin-bottom:4px">Report a Disaster Incident</h4>
+          <div style="color:var(--text-muted);font-size:0.82rem">Help us coordinate relief by reporting what you've seen or experienced</div>
+        </div>
+        <a href="user-dashboard.html" style="color:var(--text-secondary);text-decoration:none;font-size:0.875rem;transition:var(--transition-sm)" onmouseover="this.style.color='var(--accent-red)'" onmouseout="this.style.color='var(--text-secondary)'">← Back</a>
+      </div>
+
+      <!-- Success State -->
+      <div class="success-state" id="success-state">
+        <div class="success-icon">✅</div>
+        <h3 style="font-weight:800;margin-bottom:12px">Report Submitted!</h3>
+        <p style="color:var(--text-secondary);max-width:380px;margin-bottom:18px">Your disaster report has been received. Relief agencies and volunteers have been notified and will respond shortly.</p>
+        <div id="ai-result-box" style="display:none;background:rgba(0,180,255,0.08);border:1px solid rgba(0,180,255,0.2);padding:16px;border-radius:var(--radius);margin-bottom:28px;max-width:400px;width:100%">
+          <div style="font-size:0.75rem;color:var(--accent-blue);font-weight:700;margin-bottom:4px;text-transform:uppercase;letter-spacing:1px">🤖 AI Damage Analysis</div>
+          <div style="font-size:1.05rem;font-weight:700" id="ai-prediction-text"></div>
+          <div style="font-size:0.82rem;color:var(--text-muted);margin-top:2px">Confidence: <span id="ai-confidence-text"></span>%</div>
+          <div style="font-size:0.78rem;color:var(--text-muted);margin-top:6px;display:none" id="ai-note-text"></div>
+        </div>
+        <div class="flex gap-12" style="flex-wrap:wrap;justify-content:center">
+          <a href="help-request.html" class="btn btn-primary">🆘 Request Help Now</a>
+          <a href="user-dashboard.html" class="btn btn-outline">📊 Go to Dashboard</a>
+          <a href="map.html" class="btn btn-outline" id="success-map-link">🗺️ View on Map</a>
+        </div>
+      </div>
+
+      <form id="report-form">
+        <!-- Step 1: Disaster Type -->
+        <div class="resq-card mb-20">
+          <h6 style="font-weight:700;margin-bottom:4px">Step 1: Select Disaster Type *</h6>
+          <p style="color:var(--text-muted);font-size:0.8rem;margin-bottom:18px">Choose the category that best describes the disaster</p>
+          <div style="display:flex;flex-wrap:wrap;gap:10px">
+            <div class="disaster-chip" data-type="Flood"><span class="chip-icon">🌊</span> Flood</div>
+            <div class="disaster-chip" data-type="Cyclone"><span class="chip-icon">🌀</span> Cyclone</div>
+            <div class="disaster-chip" data-type="Earthquake"><span class="chip-icon">🌍</span> Earthquake</div>
+            <div class="disaster-chip" data-type="Landslide"><span class="chip-icon">⛰️</span> Landslide</div>
+            <div class="disaster-chip" data-type="Fire"><span class="chip-icon">🔥</span> Fire</div>
+          </div>
+          <input type="hidden" id="disaster-type-input" required>
+          <div id="disaster-hint" style="margin-top:14px;display:none"></div>
+        </div>
+
+        <!-- Step 2: Description -->
+        <div class="resq-card mb-20">
+          <h6 style="font-weight:700;margin-bottom:4px">Step 2: Describe the Situation *</h6>
+          <p style="color:var(--text-muted);font-size:0.8rem;margin-bottom:18px">Provide as much detail as possible about the disaster, affected area, and people</p>
+          <div class="resq-form-group">
+            <label class="resq-label">Detailed Description *</label>
+            <textarea class="resq-textarea" id="report-description" rows="5"
+              placeholder="Describe the disaster: location details, what happened, how many people are affected, current conditions, any immediate dangers..."></textarea>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+            <div class="resq-form-group">
+              <label class="resq-label">Estimated People Affected</label>
+              <input type="number" class="resq-input" placeholder="e.g. 50" min="1">
+            </div>
+            <div class="resq-form-group">
+              <label class="resq-label">Severity (Your assessment)</label>
+              <select class="resq-select">
+                <option value="">Select severity...</option>
+                <option>Critical — Immediate response needed</option>
+                <option>Severe — Urgent response needed</option>
+                <option>Moderate — Response within hours</option>
+                <option>Minor — Can wait for assessment</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 3: Media & Location -->
+        <div class="resq-card mb-20">
+          <h6 style="font-weight:700;margin-bottom:4px">Step 3: Upload Media &amp; Capture Location *</h6>
+          <p style="color:var(--text-muted);font-size:0.8rem;margin-bottom:18px">Images help AI assess damage severity and assist relief agencies</p>
+
+          <div class="resq-form-group">
+            <label class="resq-label">Upload Images / Videos (up to 5 files, max 10MB each)</label>
+            <div class="file-upload-area" id="file-drop-area" onclick="document.getElementById('file-input').click()">
+              <div class="file-upload-icon">📸</div>
+              <div class="file-upload-text">
+                Drag &amp; drop files here or <span>Browse</span>
+              </div>
+              <div style="color:var(--text-muted);font-size:0.72rem;margin-top:5px">JPG, PNG, MP4, MOV — Max 10MB each</div>
+            </div>
+            <input type="file" id="file-input" accept="image/*,video/*" multiple style="display:none">
+            <div id="file-preview" style="margin-top:10px;display:flex;flex-wrap:wrap;gap:8px"></div>
+          </div>
+
+          <div class="resq-form-group">
+            <label class="resq-label">GPS Location * <span style="color:var(--text-muted);font-weight:400;font-size:0.72rem">(click map or use button below)</span></label>
+            <!-- Address search -->
+            <div style="position:relative;margin-bottom:10px">
+              <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--text-muted);pointer-events:none">🔍</span>
+              <input id="loc-search-input" class="resq-input" placeholder="Search address…" autocomplete="off" style="padding-left:36px">
+              <div id="loc-search-results" style="display:none;position:absolute;top:calc(100% + 6px);left:0;right:0;background:var(--bg-card);border:1px solid rgba(255,45,85,0.2);border-radius:var(--radius-sm);z-index:1000;max-height:200px;overflow-y:auto;box-shadow:var(--shadow-lg)"></div>
+            </div>
+            <!-- Map -->
+            <div id="location-picker-map" style="position:relative;isolation:isolate;height:380px;border-radius:var(--radius);overflow:hidden;border:1px solid var(--border-subtle);margin-bottom:10px"></div>
+            <div class="flex gap-10 items-center" style="flex-wrap:wrap">
+              <button type="button" class="btn btn-primary btn-sm" id="get-location-btn">
+                📍 Detect My Location
+              </button>
+              <div style="flex:1;min-width:180px">
+                <input type="text" class="resq-input" id="location-input" placeholder="Location will appear here…" readonly>
+                <div id="location-status" style="color:var(--text-muted);font-size:0.72rem;margin-top:4px"></div>
+              </div>
+            </div>
+            <input type="hidden" id="lat-input">
+            <input type="hidden" id="lng-input">
+          </div>
+
+          <div class="resq-form-group">
+            <label class="resq-label">Area / Landmark (optional)</label>
+            <input type="text" class="resq-input" placeholder="e.g. Near Kukatpally Metro Station, Hyderabad">
+          </div>
+        </div>
+
+        <!-- Submit -->
+        <div class="resq-card">
+          <div class="resq-alert warning mb-20">
+            ⚠️ <span>By submitting, you confirm this is an actual disaster report. False reports may delay genuine relief efforts.</span>
+          </div>
+          <div class="flex gap-12" style="flex-wrap:wrap">
+            <button type="submit" class="btn btn-primary btn-lg" id="submit-btn">
+              🚨 Submit Disaster Report
+            </button>
+            <a href="user-dashboard.html" class="btn btn-ghost btn-lg">Cancel</a>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div id="toast-container"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="js/api.js"></script>
+<script src="js/main.js"></script>
+<script src="js/leaflet-map.js?v=location-1"></script>
+<script src="js/report.js?v=location-1"></script>
+</body>
+</html>
+

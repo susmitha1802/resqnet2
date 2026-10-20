@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+  <title>ResQNet — Admin Dashboard</title>
+  <link href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" rel="stylesheet" />
+  <link href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" rel="stylesheet" />
+  <link href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" rel="stylesheet" />
+  <link href="css/styles.css" rel="stylesheet" />
+  <style>
+    .tab-section {
+      display: none;
+    }
+
+    .tab-section.active {
+      display: block;
+    }
+
+    .proof-img {
+      max-height: 140px;
+      border-radius: var(--radius-sm);
+      object-fit: cover;
+      border: 1px solid var(--border-subtle);
+      cursor: pointer;
+    }
+
+    .verify-actions {
+      display: flex;
+      gap: 8px;
+    }
+  </style>
+</head>
+
+<body class="dashboard-page">
+
+  <!-- SIDEBAR -->
+  <aside class="resq-sidebar" id="resq-sidebar">
+    <a class="sidebar-logo" href="index.html">
+      <div class="brand-icon">🚨</div>
+      <span class="brand-name">Res<span>Q</span>Net</span>
+    </a>
+    <nav class="sidebar-nav">
+      <div class="sidebar-section-title">Administration</div>
+      <a class="sidebar-nav-item active nav-link" href="#" data-section="dashboard"
+        onclick="showSection('dashboard'); return false;"><span class="nav-icon">📊</span> Dashboard</a>
+      <a class="sidebar-nav-item" href="map.html"><span class="nav-icon">🗺️</span> Live Map</a>
+      <div class="sidebar-section-title" style="margin-top:10px">Data Sections</div>
+      <a class="sidebar-nav-item nav-link" href="#" data-section="analytics"
+        onclick="showSection('analytics'); return false;"><span class="nav-icon">📈</span> Analytics</a>
+      <a class="sidebar-nav-item nav-link" href="#" data-section="reports"
+        onclick="showSection('reports'); return false;"><span class="nav-icon">📢</span> Reports</a>
+      <a class="sidebar-nav-item nav-link" href="#" data-section="help-requests"
+        onclick="showSection('help-requests'); return false;"><span class="nav-icon">📋</span> Help Requests</a>
+      <a class="sidebar-nav-item nav-link" href="#" data-section="preparedness"
+        onclick="showSection('preparedness'); return false;"><span class="nav-icon">🛡️</span> Preparedness</a>
+      <a class="sidebar-nav-item nav-link" href="#" data-section="verification"
+        onclick="showSection('verification'); return false;"><span class="nav-icon">✅</span> Verification</a>
+      <a class="sidebar-nav-item nav-link" href="#" data-section="messages"
+        onclick="showSection('messages'); return false;"><span class="nav-icon">📬</span> Messages</a>
+      <div class="sidebar-section-title" style="margin-top:10px">Account</div>
+      <a class="sidebar-nav-item" href="#" onclick="handleLogout(); return false;"><span class="nav-icon">🚪</span>
+        Logout</a>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="sidebar-user">
+        <div class="sidebar-avatar" id="sidebar-avatar" style="background:var(--grad-primary)">A</div>
+        <div>
+          <div class="sidebar-user-name" id="sidebar-username">Admin Officer</div>
+          <div class="sidebar-user-role" id="sidebar-userrole">Administrator</div>
+        </div>
+      </div>
+    </div>
+  </aside>
+  <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+  <!-- MAIN CONTENT -->
+  <main class="dashboard-content">
+
+    <!-- PAGE HEADER -->
+    <div class="dashboard-header"
+      style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;">
+      <div>
+        <div class="dashboard-title">Admin Dashboard</div>
+        <div class="dashboard-subtitle">Real-time analytics &amp; relief coordination overview</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px;">
+        <div class="notif-wrapper" id="notif-wrapper">
+          <div class="notif-bell" id="notif-bell" onclick="toggleNotifDropdown()">
+            🔔
+            <div class="notif-badge" id="notif-badge">0</div>
+          </div>
+          <div class="notif-dropdown" id="notif-dropdown">
+            <div class="notif-header">
+              <div class="notif-header-title">🔔 Notifications</div>
+              <button class="notif-clear-btn" onclick="clearNotifications()">Mark all read</button>
+            </div>
+            <div class="notif-list" id="notif-list">
+              <div class="notif-empty">⏳ Loading...</div>
+            </div>
+            <div class="notif-footer">
+              <a href="#" onclick="showSection('help-requests');closeNotifDropdown()">View all requests →</a>
+            </div>
+          </div>
+        </div>
+        <span id="eoc-clock" style="color:var(--text-muted);font-size:0.82rem;"></span>
+        <a class="btn btn-primary btn-sm" href="map.html">🗺️ Live Map</a>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════ -->
+    <!-- SECTION: DASHBOARD (default)              -->
+    <!-- ══════════════════════════════════════════ -->
+    <div class="tab-section active" id="section-dashboard">
+      <div class="stats-grid-4 mb-20">
+        <div class="stat-card primary">
+          <div class="stat-icon primary">📋</div>
+          <div>
+            <div class="stat-value" id="stat-total">0</div>
+            <div class="stat-label">Total Requests</div>
+            <div class="stat-change up" id="stat-change-total"></div>
+          </div>
+        </div>
+        <div class="stat-card danger">
+          <div class="stat-icon danger">🚨</div>
+          <div>
+            <div class="stat-value" id="stat-high">0</div>
+            <div class="stat-label">High Priority</div>
+            <div class="stat-change down" id="stat-change-high"></div>
+          </div>
+        </div>
+        <div class="stat-card success">
+          <div class="stat-icon success">👥</div>
+          <div>
+            <div class="stat-value" id="stat-volunteers">0</div>
+            <div class="stat-label">Active Volunteers</div>
+            <div class="stat-change up" id="stat-change-volunteers"></div>
+          </div>
+        </div>
+        <div class="stat-card warning">
+          <div class="stat-icon warning">✅</div>
+          <div>
+            <div class="stat-value" id="stat-completed">0</div>
+            <div class="stat-label">Completed</div>
+            <div class="stat-change up" id="stat-change-completed"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="stats-grid-3 mb-24">
+        <div class="stat-card info">
+          <div class="stat-icon info">⏳</div>
+          <div>
+            <div class="stat-value" id="stat-pending">0</div>
+            <div class="stat-label">Pending Requests</div>
+            <div class="stat-change down" id="stat-change-pending"></div>
+          </div>
+        </div>
+        <div class="stat-card primary">
+          <div class="stat-icon primary">📢</div>
+          <div>
+            <div class="stat-value" id="stat-reports">0</div>
+            <div class="stat-label">Disaster Reports</div>
+            <div class="stat-change up" id="stat-change-reports"></div>
+          </div>
+        </div>
+        <div class="stat-card warning">
+          <div class="stat-icon warning">📬</div>
+          <div>
+            <div class="stat-value" id="stat-support-messages">0</div>
+            <div class="stat-label">Support Messages</div>
+            <div class="stat-change up" id="stat-change-support-messages"></div>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+        <!-- Live Weather -->
+        <div class="eoc-card">
+          <h3 style="margin-bottom:16px;">🌤 Live Weather — Visakhapatnam</h3>
+          <div class="eoc-weather-widget">
+            <div class="eoc-weather-main" id="weather-current-main">
+              <span class="eoc-weather-icon">☁</span>
+              <div>
+                <div class="eoc-weather-temp">--°C</div>
+                <div class="eoc-weather-desc" id="weather-current-desc">Loading...</div>
+              </div>
+            </div>
+            <div class="eoc-weather-details" id="weather-current-metrics">
+              <div class="eoc-weather-stat"><span class="eoc-weather-stat-label">Humidity</span><span
+                  class="eoc-weather-stat-val">--%</span></div>
+              <div class="eoc-weather-stat"><span class="eoc-weather-stat-label">Wind</span><span
+                  class="eoc-weather-stat-val">-- m/s</span></div>
+              <div class="eoc-weather-stat"><span class="eoc-weather-stat-label">Pressure</span><span
+                  class="eoc-weather-stat-val">-- hPa</span></div>
+              <div class="eoc-weather-stat"><span class="eoc-weather-stat-label">Visibility</span><span
+                  class="eoc-weather-stat-val">-- km</span></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Preparedness Center -->
+        <div class="eoc-card">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+            <h3 style="color:var(--accent-amber);">⚠ Preparedness Center</h3>
+            <button class="btn-resq-outline" onclick="fetchOWMAlert(event)">🔄 Refresh OWM</button>
+          </div>
+          <div id="prep-alerts-list">
+            <p style="color:var(--text-muted)">No active alerts.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════ -->
+    <!-- SECTION: ANALYTICS                        -->
+    <!-- ══════════════════════════════════════════ -->
+    <div class="tab-section" id="section-analytics">
+      <h2 style="margin-bottom:20px;font-weight:800;">📊 Analytics &amp; Data</h2>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
+        <div class="chart-card">
+          <div class="chart-card-title">Requests by Type</div>
+          <div class="chart-card-subtitle">Distribution across relief categories</div>
+          <div style="height:240px"><canvas id="chart-requests-type"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-card-title">Request Status</div>
+          <div class="chart-card-subtitle">Current operational breakdown</div>
+          <div style="height:240px"><canvas id="chart-status"></canvas></div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:2fr 1fr;gap:16px;margin-bottom:16px;">
+        <div class="chart-card">
+          <div class="chart-card-title">Weekly Request Trend</div>
+          <div class="chart-card-subtitle">New requests this week</div>
+          <div style="height:240px"><canvas id="chart-trend"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-card-title">Disaster Type Reports</div>
+          <div class="chart-card-subtitle">Breakdown by category</div>
+          <div style="height:240px"><canvas id="chart-disasters"></canvas></div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:2fr 1fr;gap:16px;">
+        <div class="resq-card">
+          <div style="font-weight:700;font-size:0.95rem;margin-bottom:16px;">📦 Relief Distribution Statistics</div>
+          <div id="distribution-bars">
+            <div style="text-align:center;padding:20px;color:var(--text-muted)">No data yet</div>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:14px;">
+          <div class="resq-card" style="flex:1">
+            <div style="font-weight:700;font-size:0.9rem;margin-bottom:14px">👥 Volunteer Summary</div>
+            <div id="volunteer-summary" style="display:flex;flex-direction:column;gap:10px">
+              <div style="text-align:center;padding:16px;color:var(--text-muted);font-size:0.82rem">Loading...</div>
+            </div>
+          </div>
+          <div class="resq-card">
+            <h6 style="font-weight:700;margin-bottom:14px;font-size:0.9rem">📞 Emergency Contacts</h6>
+            <div style="display:flex;flex-direction:column;gap:6px">
+              <a class="emergency-link red" href="tel:112"><span>🚨 ERSS (All)</span><strong
+                  class="red">112</strong></a>
+              <a class="emergency-link blue" href="tel:100"><span>🚓 Police</span><strong class="blue">100</strong></a>
+              <a class="emergency-link amber" href="tel:101"><span>🚒 Fire</span><strong class="amber">101</strong></a>
+              <a class="emergency-link green" href="tel:108"><span>🚑 Ambulance</span><strong
+                  class="green">108</strong></a>
+              <a class="emergency-link purple" href="tel:1078"><span>🏛️ NDRF</span><strong
+                  class="purple">1078</strong></a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════ -->
+    <!-- SECTION: REPORTS                          -->
+    <!-- ══════════════════════════════════════════ -->
+    <div class="tab-section" id="section-reports">
+      <div class="eoc-card">
+        <h3 style="margin-bottom:16px;color:#8b5cf6;">📢 Disaster Reports &amp; AI Analysis</h3>
+        <div class="resq-table-wrapper">
+          <table class="resq-table">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Reporter</th>
+                <th>Type</th>
+                <th>Severity</th>
+                <th>Location</th>
+                <th>AI Analysis</th>
+                <th>Time</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="disasters-tbody">
+              <tr>
+                <td colspan="8" style="text-align:center;padding:30px;color:var(--text-muted)">Loading...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════ -->
+    <!-- SECTION: HELP REQUESTS                    -->
+    <!-- ══════════════════════════════════════════ -->
+    <div class="tab-section" id="section-help-requests">
+      <div class="eoc-card">
+        <h3 style="margin-bottom:16px;">📋 All Help Requests</h3>
+        <div class="resq-table-wrapper">
+          <table class="resq-table">
+            <thead>
+              <tr>
+                <th>Request ID</th>
+                <th>User</th>
+                <th>Type</th>
+                <th>Priority</th>
+                <th>Status</th>
+                <th>Location</th>
+                <th>Time</th>
+                <th>People</th>
+              </tr>
+            </thead>
+            <tbody id="requests-tbody">
+              <tr>
+                <td colspan="8" style="text-align:center;padding:30px;color:var(--text-muted)">Loading...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════ -->
+    <!-- SECTION: PREPAREDNESS                     -->
+    <!-- ══════════════════════════════════════════ -->
+    <div class="tab-section" id="section-preparedness">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+        <div class="eoc-card">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+            <h3 style="color:var(--accent-red);">🔴 Active Weather Alerts</h3>
+            <div style="display:flex;gap:8px;">
+              <button class="btn-resq" onclick="fetchOWMAlert(event)">🔄 Fetch OWM</button>
+              <button class="btn-resq-outline" onclick="showCreateAlertModal()">+ Manual</button>
+            </div>
+          </div>
+          <div id="alerts-list">
+            <p style="color:var(--text-muted)">Loading alerts...</p>
+          </div>
+        </div>
+        <div class="eoc-card">
+          <h3 style="margin-bottom:16px;">👥 Volunteer &amp; NGO Readiness</h3>
+          <div style="display:flex;flex-direction:column;gap:12px;">
+            <div id="prep-vol-ready" style="font-size:1.1rem;font-weight:600;">🟢 0 Volunteers Ready</div>
+            <div id="prep-ngo-ready" style="font-size:1.1rem;font-weight:600;">🟢 0 NGOs Available</div>
+            <button class="btn-resq" style="padding:10px;" onclick="notifyAllResponders('volunteer')">📣 Notify All
+              Volunteers</button>
+            <button class="btn-resq-outline" style="padding:10px;" onclick="notifyAllResponders('ngo')">📣 Notify All
+              NGOs</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════ -->
+    <!-- SECTION: VERIFICATION                     -->
+    <!-- ══════════════════════════════════════════ -->
+    <div class="tab-section" id="section-verification">
+      <div class="resq-card">
+        <div style="font-weight:700;font-size:0.95rem;margin-bottom:16px;">🛡️ Verification Queue — Volunteer Proof
+          Submissions</div>
+        <div class="resq-table-wrapper">
+          <table class="resq-table">
+            <thead>
+              <tr>
+                <th>Task ID</th>
+                <th>Volunteer</th>
+                <th>Completion Notes</th>
+                <th>Proof</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="verifications-tbody">
+              <tr>
+                <td colspan="6" style="text-align:center;padding:30px;color:var(--text-muted)">Loading...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════ -->
+    <!-- SECTION: MESSAGES                         -->
+    <!-- ══════════════════════════════════════════ -->
+    <div class="tab-section" id="section-messages">
+      <div class="resq-card">
+        <div style="font-weight:700;font-size:0.95rem;margin-bottom:16px;">📬 Support Messages</div>
+        <div class="resq-table-wrapper">
+          <table class="resq-table">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Email</th>
+                <th>Subject</th>
+                <th>Message</th>
+                <th>Date</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="support-messages-tbody">
+              <tr>
+                <td colspan="7" style="text-align:center;padding:30px;color:var(--text-muted)">Loading...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <button class="sidebar-toggle" id="sidebar-toggle-btn">☰</button>
+  <div id="toast-container"></div>
+
+  <!-- Create Alert Modal -->
+  <div id="create-alert-modal"
+    style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:1000;align-items:center;justify-content:center">
+    <div style="background:var(--bg-card);border-radius:var(--radius);padding:32px;min-width:380px;max-width:500px">
+      <h3 style="margin-bottom:20px">Create Manual Alert</h3>
+      <select id="modal-alert-type"
+        style="width:100%;margin-bottom:12px;padding:10px;border-radius:8px;border:1px solid var(--border-glass);background:var(--bg-input);color:var(--text-primary)">
+        <option value="Cyclone">Cyclone</option>
+        <option value="Flood">Flood</option>
+        <option value="Storm">Storm</option>
+        <option value="Heatwave">Heatwave</option>
+        <option value="Earthquake">Earthquake</option>
+        <option value="Other">Other</option>
+      </select>
+      <select id="modal-severity"
+        style="width:100%;margin-bottom:12px;padding:10px;border-radius:8px;border:1px solid var(--border-glass);background:var(--bg-input);color:var(--text-primary)">
+        <option value="Watch">Watch</option>
+        <option value="Warning">Warning</option>
+        <option value="Emergency">Emergency</option>
+      </select>
+      <textarea id="modal-description" placeholder="Description" rows="3"
+        style="width:100%;margin-bottom:12px;padding:10px;border-radius:8px;border:1px solid var(--border-glass);background:var(--bg-input);color:var(--text-primary);resize:none"></textarea>
+      <input id="modal-lat" placeholder="Latitude (default: 17.6868)"
+        style="width:100%;margin-bottom:12px;padding:10px;border-radius:8px;border:1px solid var(--border-glass);background:var(--bg-input);color:var(--text-primary)"
+        type="number" />
+      <input id="modal-lng" placeholder="Longitude (default: 83.2185)"
+        style="width:100%;margin-bottom:12px;padding:10px;border-radius:8px;border:1px solid var(--border-glass);background:var(--bg-input);color:var(--text-primary)"
+        type="number" />
+      <input id="modal-radius" placeholder="Radius km (default: 50)"
+        style="width:100%;margin-bottom:20px;padding:10px;border-radius:8px;border:1px solid var(--border-glass);background:var(--bg-input);color:var(--text-primary)"
+        type="number" />
+      <div style="display:flex;gap:10px;justify-content:flex-end">
+        <button class="btn-resq-outline" onclick="closeCreateAlertModal()">Cancel</button>
+        <button class="btn-resq" onclick="submitManualAlert()">Create Alert</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/main.js"></script>
+  <script src="js/admin-dashboard.js"></script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+  <script src="js/leaflet-map.js"></script>
+
+  <script>
+    /* Notification Bell */
+    let notifOpen = false, notifLoaded = false;
+    function toggleNotifDropdown() {
+      notifOpen = !notifOpen;
+      document.getElementById('notif-dropdown').classList.toggle('open', notifOpen);
+      if (notifOpen && !notifLoaded) loadNotifications();
+    }
+    function closeNotifDropdown() {
+      notifOpen = false;
+      document.getElementById('notif-dropdown').classList.remove('open');
+    }
+    function clearNotifications() {
+      const list = document.getElementById('notif-list');
+      if (list) list.innerHTML = '<div class="notif-empty">✅ All caught up!</div>';
+      const badge = document.getElementById('notif-badge');
+      if (badge) { badge.textContent = '0'; badge.classList.add('hidden'); }
+    }
+    async function loadNotifications() {
+      notifLoaded = true;
+      const list = document.getElementById('notif-list');
+      const badge = document.getElementById('notif-badge');
+      if (!list) return;
+      const data = await Api.get('/admin/dashboard');
+      const high = data?.recent_high || [];
+      const pend = data?.stats?.pending || 0;
+      const items = [];
+      if (pend > 0) items.push({ dot: 'high', title: `${pend} requests awaiting assignment`, sub: 'Pending — no volunteer assigned yet' });
+      const typeIcons = { Rescue: '🚁', Food: '🍱', Water: '💧', Medicine: '💊', Shelter: '🏠' };
+      high.forEach(r => items.push({ dot: 'high', title: `${typeIcons[r.request_type] || '📋'} ${r.request_type} — ${r.name}`, sub: `${r.number_of_people} people • High Priority`, scrollTarget: 'help-requests' }));
+      if (!items.length) {
+        list.innerHTML = '<div class="notif-empty">✅ No high-priority alerts.</div>';
+        if (badge) { badge.textContent = '0'; badge.classList.add('hidden'); }
+        return;
+      }
+      list.innerHTML = items.map(it => `<div class="notif-item" onclick="${it.scrollTarget ? `showSection('${it.scrollTarget}');closeNotifDropdown()` : ''}"><div class="notif-dot"></div><div><div class="notif-item-title">${it.title}</div><div class="notif-item-sub">${it.sub}</div></div></div>`).join('');
+      if (badge) { badge.textContent = items.length; badge.classList.toggle('hidden', items.length === 0); }
+    }
+    document.addEventListener('click', e => {
+      const wrapper = document.getElementById('notif-wrapper');
+      if (notifOpen && wrapper && !wrapper.contains(e.target)) closeNotifDropdown();
+    });
+
+    window.addEventListener('DOMContentLoaded', () => {
+      showSection('dashboard');
+    });
+  </script>
+</body>
+
+</html>
