@@ -1,136 +1,292 @@
 # ResQNet
 
-Community disaster preparedness and emergency assistance for citizens, volunteers,
-NGOs and administrators. Existing SOS acceptance, progress, private completion
-proof and admin approval, NGO-owned resources, analytics and Leaflet mapping are
-preserved. Flood Intelligence is optional and experimental; community observations
-and weather thresholds are **not official disaster warnings**.
+**AI-Powered Disaster Preparedness & Response Coordination Platform**
 
-Architecture: static HTML/CSS/JavaScript + Leaflet in `frontend/`, Flask role-gated
-API and SQLAlchemy records in `backend/`, local SQLite and private uploads under
-ignored runtime directories. [SUBMISSION_DEMO.md](SUBMISSION_DEMO.md) gives a
-role-by-role rehearsal; [SUBMISSION_READINESS_REPORT.md](SUBMISSION_READINESS_REPORT.md)
-separates local demo readiness from public deployment blockers.
+ResQNet is a web-based platform designed to simplify disaster reporting, emergency assistance coordination, and access to preparedness information.
 
-This source-only copy contains no accounts, database, uploaded evidence, `.env`,
-virtual environment or previous Git history. See [CLEAN_REPO_AUDIT.md](CLEAN_REPO_AUDIT.md)
-for copy/validation evidence and [DEPLOYMENT_READINESS.md](DEPLOYMENT_READINESS.md)
-for unresolved release requirements. Tests passing does not certify deployment.
+It connects citizens, volunteers, NGOs, and administrators through a centralized system with role-based dashboards, interactive maps, AI-powered guidance, and weather information.
 
-## Local setup (PowerShell)
+**[Live Website](https://resqnet2026.netlify.app)** · **[Backend API](https://resqnet2.onrender.com/health)**
 
-Use Python 3.12 and Node.js with its built-in test runner. Commands below install
-only the existing pinned backend requirements; setup was not installed/copied as
-part of preparing this repository.
+> **Note:** ResQNet is a developing platform, not an official emergency dispatch or disaster warning service.
 
-```powershell
-Set-Location 'D:\B.Tech\Hackathons\MultiModel-AI-26\ResQNet'
-py -3.12 -m venv .venv
-.\.venv\Scripts\python.exe -m pip install -r backend\requirements.txt
+---
+
+## Features
+
+### Disaster Reporting & Assistance
+- Submit disaster incident reports with location details and supporting images.
+- Request assistance for rescue, food, water, shelter, or medical needs.
+- Track the status of submitted requests.
+- Manage reports and assistance workflows through role-based dashboards.
+
+### Role-Based Dashboards
+
+| Role | Capabilities |
+|---|---|
+| Citizen | Report incidents, request assistance, track requests |
+| Volunteer | View assigned tasks, update progress |
+| NGO | Coordinate resources and relief activities |
+| Admin | Manage reports, users, requests, and analytics |
+
+### AI-Powered Chatbot
+
+Powered by **Groq**, the ResQNet chatbot provides conversational guidance about disaster preparedness and safety.
+
+- Natural-language conversations
+- Disaster preparedness information
+- Suggested questions and responsive chat interface
+- Typing indicators and message timestamps
+- Server-side API integration
+- Input validation and rate limiting
+
+The chatbot provides informational assistance only. It does not independently verify emergencies or dispatch rescue services.
+
+### Weather Dashboard
+
+Integrated with **OpenWeather** to display available weather observations:
+
+- Temperature and weather conditions
+- Humidity and wind speed
+- Reported rainfall, when available
+- Location-specific weather information
+- Loading and error handling
+
+### Interactive Maps
+
+Built with **Leaflet.js and OpenStreetMap**.
+
+- Geographic visualization of authorized incident data
+- Location-based reporting
+- Interactive map controls
+- Privacy-aware access to incident information
+
+### Analytics & Statistics
+
+- Database-backed homepage statistics
+- Incident and assistance request tracking
+- Administrative analytics
+- Dynamic updates from backend APIs
+- Empty-data handling without fabricated statistics
+
+---
+
+## Flood Intelligence
+
+ResQNet also includes a developing Flood Intelligence capability focused on satellite-based flood analysis and infrastructure exposure.
+
+The analytical workflow uses:
+
+- Sentinel-1 SAR imagery
+- Sentinel-2 optical imagery
+- Copernicus elevation data
+- Geospatial change detection
+- Terrain and persistent-water filtering
+- OpenStreetMap infrastructure data
+- Road network exposure analysis
+
+**Processing workflow:**
+
+```text
+Satellite Imagery
+       |
+       v
+Preprocessing
+       |
+       v
+SAR Change Detection
+       |
+       v
+Terrain & Water Filtering
+       |
+       v
+Flood Candidate Mapping
+       |
+       v
+Optical Evidence Assessment
+       |
+       v
+Infrastructure Exposure Analysis
+       |
+       v
+Scientific Review & Visualization
 ```
 
-Create a private local environment file with persistent random signing secrets.
-This command refuses to overwrite an existing `.env` and does not print secrets:
+Flood Intelligence currently operates as a separate analytical prototype. Its outputs are exploratory flood candidates, not independently confirmed inundation maps. Integration into the live ResQNet dashboard remains a planned enhancement.
 
-```powershell
-@'
-from pathlib import Path
-import secrets
-p = Path('backend/.env')
-text = Path('backend/.env.example').read_text(encoding='utf-8')
-for key in ('SECRET_KEY', 'JWT_SECRET_KEY'):
-    text = text.replace('\n' + key + '=\n', '\n' + key + '=' + secrets.token_urlsafe(48) + '\n')
-with p.open('x', encoding='utf-8') as output:
-    output.write(text)
-print('Private backend/.env created; secret values were not printed.')
-'@ | .\.venv\Scripts\python.exe -B -
+---
+
+## Tech Stack
+
+| Layer | Technologies |
+|---|---|
+| Frontend | HTML, CSS, JavaScript |
+| Backend | Python, Flask, REST APIs |
+| Database | Supabase PostgreSQL |
+| ORM | SQLAlchemy |
+| Storage | Supabase Storage |
+| Authentication | JWT, bcrypt |
+| AI | Groq API |
+| Weather | OpenWeather API |
+| Maps | Leaflet.js, OpenStreetMap |
+| Rate Limiting | Redis |
+| Deployment | Netlify, Render |
+
+---
+
+## Architecture
+
+```text
+                  USERS
+                    |
+      +-------------+-------------+
+      |             |             |
+   Citizens     Volunteers     NGOs / Admins
+      |             |             |
+      +-------------+-------------+
+                    |
+                    v
+             FRONTEND (Netlify)
+             HTML / CSS / JS
+                    |
+                    v
+             BACKEND (Render)
+                Flask API
+                    |
+      +-------------+-------------+
+      |             |             |
+      v             v             v
+ Authentication  Core Services  Integrations
+      |             |             |
+      |       Reports / SOS       +---- Groq AI
+      |       Tasks / Stats       +---- OpenWeather
+      |       NGO Management      +---- OpenStreetMap
+      |             |
+      +------+------+ 
+             |
+      +------+------+
+      |             |
+      v             v
+   Supabase       Redis
+ PostgreSQL &   Rate Limiting
+ Private Storage
 ```
 
-Review `backend/.env` privately. Default `DATABASE_URL=sqlite:///resqnet.db` creates
-**`backend/instance/resqnet.db`**. `UPLOAD_FOLDER=uploads` resolves to
-`backend/uploads`, never frontend. `SEED_DEMO_DATA=False` and `FLASK_DEBUG=False`
-must remain false. Do not point this copy at the original project's database.
-Blank weather/flood settings produce unavailable results, not sample live alerts.
+The Flood Intelligence processing pipeline is maintained separately from the live application backend.
 
-Initialize fresh tables, then start Flask in terminal 1:
+---
 
-```powershell
-.\.venv\Scripts\python.exe -B -c "import sys; sys.path.insert(0, 'backend'); from app import create_app; create_app(); print('Tables initialized; no demo records seeded.')"
-.\.venv\Scripts\python.exe -B backend\app.py
+## Getting Started
+
+### Prerequisites
+
+- Python 3.x
+- Git
+- Access to a configured PostgreSQL database
+- Required API credentials
+
+### 1. Clone the Repository
+
+```bash
+git clone https://github.com/susmitha1802/resqnet2.git
+cd resqnet2
 ```
 
-The factory creates missing tables without resetting existing ones. No demo
-accounts or known passwords are provisioned. Register citizens, volunteers and
-NGOs through `auth.html`. Admin enrollment remains secret-gated: an operator may
-privately set a random `ADMIN_SECRET_CODE` of at least 32 characters, restart the
-backend, register an authorized non-demo admin, then unset it and restart.
-Never publish that code or change an existing role to bypass access checks.
+### 2. Install Backend Dependencies
 
-In terminal 2:
-
-```powershell
-.\.venv\Scripts\python.exe -B -m http.server 5500 --bind 127.0.0.1 --directory frontend
+```bash
+pip install -r backend/requirements.txt
 ```
 
-Open `http://127.0.0.1:5500/auth.html`. Serve **only `frontend/`**, not this repository.
-Local frontend defaults to `http://127.0.0.1:5000`. Existing
-`window.RESQNET_API_BASE` or `localStorage.resqnet_api_base` overrides win; inspect
-`Api.BASE` and remove stale overrides before login. Hosted pages retain the
-previous Render URL in `frontend/js/api.js`; verify/update it for the intended
-backend before deployment. Static Netlify variables do not rewrite JavaScript.
+### 3. Configure Environment Variables
 
-The homepage uses the existing backend `/weather/live` proxy. Provide a rotated
-`OPENWEATHER_API_KEY` only in the backend environment; never put provider keys in
-HTML/JavaScript. See [LOCAL_FLOOD.md](LOCAL_FLOOD.md) for opt-in event API setup.
-No satellite data or processing environment is included here.
+Create `backend/.env` using `backend/.env.example` as a reference.
 
-The optional guidance chat uses `POST /api/chat`. To try it locally, put a private
-`GROQ_API_KEY` in ignored `backend/.env` and optionally select a currently supported
-chat model with `GROQ_MODEL`; restart Flask, then open any frontend page and use
-the floating **ResQNet guidance** button. The default model is
-`openai/gpt-oss-20b`. Leave the key blank to receive a clear unavailable response.
-The browser never receives the key, chat history is held only in page memory,
-and the assistant cannot inspect accounts or submit an SOS. For quota-free
-verification, run `unittest discover -s backend/tests -p test_chat.py` and
-`node --test frontend/tests/chatbot.test.cjs`; both mock Groq. A live question
-uses Groq quota and is not part of automated tests.
-
-Map address searches run only after Enter or Search. The backend `/geocode` proxy
-shares a one-request-per-second limit and caches lookups, using the existing Redis
-rate store across production workers. `NOMINATIM_BASE_URL` can switch providers;
-set `NOMINATIM_USER_AGENT` to an app-identifying, contactable value before public
-use. GPS coordinates remain usable if lookup fails. OSM tiles retain visible
-attribution, browser caching and an origin Referer. Do not submit private text to
-the geocoder or use the public service for bulk searches. See the
-[Nominatim policy](https://operations.osmfoundation.org/policies/nominatim/) and
-[tile policy](https://operations.osmfoundation.org/policies/tiles/).
-
-SOS/report evidence accepts one valid JPG or PNG. Owners and admins open stored
-images through authenticated private routes; uploads are never served from the
-static frontend. NGO owners may edit quantity/location only before allocation.
-Admins can review users, volunteer activity and NGO inventory, restore an
-unassigned duplicate to Pending, and correct a report type without marking the
-community observation scientifically verified.
-
-## Focused verification
-
-```powershell
-.\.venv\Scripts\python.exe -B -m unittest discover -s backend/tests
-node --test frontend/tests/*.test.cjs
-node frontend/tests/auth-flow.browser.cjs
-node frontend/tests/rbac.browser.cjs
-node frontend/tests/detect-location.browser.cjs
+```env
+DATABASE_URL=your_postgresql_connection_string
+GROQ_API_KEY=your_groq_api_key
+GROQ_MODEL=openai/gpt-oss-20b
+OPENWEATHER_API_KEY=your_openweather_api_key
+CORS_ORIGINS=http://127.0.0.1:5500
+PROXY_DIAGNOSTIC_ENABLED=False
 ```
 
-Browser checks require installed Chrome; `CHROME_BINARY` and `PYTHON_BINARY` may
-select existing executables. Tests create only isolated temporary/memory data.
-Runtime directory `.gitkeep` files are intentional; databases/uploads remain ignored.
-Do not run legacy data repair or demo seeding as part of normal setup.
+Additional authentication, storage, and rate-limiting settings may be required. Refer to `backend/.env.example` and `DEPLOYMENT.md`.
 
-`netlify.toml` publishes only frontend. `render.yaml` is review-only and proposes
-a paid persistent disk, private uploads, production secret generation and Gunicorn.
-No deployment has been performed or authorized by preparation of this repository.
-Production additionally requires a reachable private Redis-compatible
-`RATELIMIT_STORAGE_URI` and an operator-verified `TRUSTED_PROXY_HOPS` value.
-`memory://` and zero trusted hops are local defaults, not Render production settings.
-See DEPLOYMENT_READINESS.md for the Linux smoke gate and safe Render handoff.
+Never commit API keys or `.env` files.
+
+### 4. Start the Backend
+
+```bash
+python -B backend/app.py
+```
+
+### 5. Start the Frontend
+
+Open another terminal:
+
+```bash
+python -m http.server 5500 --bind 127.0.0.1 --directory frontend
+```
+
+Visit:
+
+http://127.0.0.1:5500
+
+---
+
+## Security
+
+ResQNet includes:
+
+- JWT-based authentication
+- Role-based access control
+- bcrypt password hashing
+- Request validation
+- API rate limiting
+- Restricted CORS origins
+- Private file storage
+- Server-side API credential management
+
+Security configuration should be reviewed before production deployment.
+
+---
+
+## Testing
+
+The latest reported local test results:
+
+| Test Suite | Result |
+|---|---|
+| Backend | 148 passed |
+| Frontend | 92 passed |
+| Responsive UI | Passed local browser checks |
+| Role-based workflows | Passed local smoke checks |
+| Groq API | Successful local response |
+
+Live weather and newly deployed application features require separate production verification.
+
+---
+
+## Deployment
+
+| Service | Platform |
+|---|---|
+| Frontend | Netlify |
+| Backend | Render |
+| Database | Supabase PostgreSQL |
+| File Storage | Supabase Storage |
+
+Production secrets are configured through the backend hosting environment.
+
+See `DEPLOYMENT.md` for deployment configuration and verification instructions.
+
+
+
+## Disclaimer
+
+ResQNet is a developing disaster preparedness and coordination platform. It is not a substitute for official emergency services, verified disaster alerts, or professional emergency guidance.
+
+---
+
+**ResQNet — Connecting Communities. Coordinating Response.**
