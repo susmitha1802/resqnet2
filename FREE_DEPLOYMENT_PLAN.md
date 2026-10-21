@@ -1,5 +1,9 @@
 # ResQNet free-only deployment feasibility plan
 
+> Subsequent preparation selected Render Free + Supabase Free for review. See
+> [DEPLOYMENT.md](DEPLOYMENT.md) for the current configuration and remaining
+> validation gates. This document retains the earlier OCI feasibility audit.
+
 Audit date: 21 October 2026. This is a plan, not deployment approval or a claim
 of production readiness. No cloud account, resource, real database, secret, or
 satellite output was accessed or changed. Provider limits below are from official

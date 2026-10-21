@@ -16,9 +16,13 @@ class Config:
     SEED_DEMO_DATA = os.getenv('SEED_DEMO_DATA', 'False') == 'True'
 
     # ── Database Configuration ──
-    # The application strictly relies on the DATABASE_URL environment variable.
-    # Neon PostgreSQL Example: postgresql+psycopg2://user:password@host/dbname?sslmode=require
-    SQLALCHEMY_DATABASE_URI = os.getenv('DATABASE_URL', 'sqlite:///resqnet.db')
+    # Supabase's session pooler uses an IPv4-compatible PostgreSQL connection.
+    _database_url = os.getenv('DATABASE_URL', 'sqlite:///resqnet.db')
+    SQLALCHEMY_DATABASE_URI = (_database_url.replace('postgresql://', 'postgresql+psycopg://', 1)
+                               if _database_url.startswith('postgresql://') else _database_url)
+    SQLALCHEMY_ENGINE_OPTIONS = ({'pool_pre_ping': True, 'pool_size': 2,
+                                  'max_overflow': 0, 'pool_recycle': 300}
+                                 if SQLALCHEMY_DATABASE_URI.startswith('postgresql+psycopg://') else {})
 
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
@@ -30,6 +34,10 @@ class Config:
     # File uploads
     UPLOAD_FOLDER      = os.path.join(os.path.dirname(__file__), os.getenv('UPLOAD_FOLDER', 'uploads'))
     PERSISTENT_STORAGE_PATH = os.getenv('PERSISTENT_STORAGE_PATH')
+    STORAGE_BACKEND = os.getenv('STORAGE_BACKEND', 'local').lower()
+    SUPABASE_URL = os.getenv('SUPABASE_URL', '')
+    SUPABASE_SECRET_KEY = os.getenv('SUPABASE_SECRET_KEY', '')
+    SUPABASE_STORAGE_BUCKET = os.getenv('SUPABASE_STORAGE_BUCKET', '')
     MAX_CONTENT_LENGTH = int(os.getenv('MAX_CONTENT_LENGTH', 10 * 1024 * 1024))  # 10 MB
     ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg'}
 

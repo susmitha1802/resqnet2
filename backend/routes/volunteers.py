@@ -5,7 +5,7 @@ PUT /volunteer/accept-task     — accept a pending request (volunteer only)
 PUT /volunteer/update-status   — update availability (volunteer only)
 PUT /volunteer/complete-task   — complete an active task (volunteer only)
 """
-from flask import Blueprint, request, jsonify, send_file
+from flask import Blueprint, request, jsonify, current_app
 from flask_jwt_extended import get_jwt_identity
 from sqlalchemy import update
 from sqlalchemy.exc import SQLAlchemyError
@@ -15,7 +15,7 @@ from extensions import db
 from models import HelpRequest, Volunteer, ReliefTask, User
 from routes.middleware import require_role, require_any_role
 from sos_lifecycle import (TransitionConflict, transition, ensure_active,
-                           save_proof, proof_file, ACTIVE_TASK_STATES)
+                           save_proof, private_proof, remove_proof, ACTIVE_TASK_STATES)
 
 volunteers_bp = Blueprint('volunteers', __name__)
 
@@ -206,7 +206,10 @@ def upload_proof(task_id):
     except (TransitionConflict, ValueError, OSError, SQLAlchemyError) as exc:
         db.session.rollback()
         if saved:
-            proof_file(saved).unlink(missing_ok=True)
+            try:
+                remove_proof(saved)
+            except OSError:
+                current_app.logger.error('New proof cleanup failed after rollback.')
         if isinstance(exc, TransitionConflict):
             return _error(str(exc), 409)
         if isinstance(exc, ValueError):
@@ -224,11 +227,7 @@ def view_proof(task_id):
     user = db.session.get(User, int(get_jwt_identity()))
     if user.role != 'admin' and task.volunteer.user_id != user.user_id:
         return _error('Access denied', 403)
-    path = proof_file(task.proof_image_path)
-    if path is None or not path.is_file():
-        return _error('Proof image is unavailable', 404)
-    response = send_file(path, mimetype='image/png' if path.suffix.lower() == '.png' else 'image/jpeg',
-                         download_name='proof' + path.suffix.lower(), conditional=False)
-    response.headers['Cache-Control'] = 'private, no-store'
-    response.headers['X-Content-Type-Options'] = 'nosniff'
-    return response
+    try:
+        return private_proof(task.proof_image_path) or _error('Proof image is unavailable', 404)
+    except OSError:
+        return _error('Proof storage is unavailable. Please retry.', 503)

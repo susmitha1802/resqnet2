@@ -1,5 +1,6 @@
 [build]
-  publish = "frontend"
+  command = "node scripts/build-netlify.cjs"
+  publish = "dist"
 
 [[headers]]
   for = "/*"

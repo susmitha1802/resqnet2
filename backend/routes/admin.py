@@ -17,7 +17,7 @@ from extensions import db
 from models import User, HelpRequest, DisasterReport, Volunteer, ReliefTask, ReliefResource
 from access import request_view, report_view
 from routes.middleware import require_role
-from sos_lifecycle import TransitionConflict, transition, proof_file, ACTIVE_TASK_STATES
+from sos_lifecycle import TransitionConflict, transition, proof_available, ACTIVE_TASK_STATES
 
 admin_bp = Blueprint('admin', __name__)
 
@@ -221,9 +221,13 @@ def verify_task(task_id):
         return _error('Invalid action')
     if task.status != 'Proof Submitted' or task.verification_status != 'Pending':
         return _error('Task is not awaiting proof verification. Refresh the review list.', 409)
-    path = proof_file(task.proof_image_path)
-    if action == 'Approve' and (path is None or not path.is_file()):
-        return _error('Proof image is unavailable. Completion cannot be approved without stored proof.', 409)
+    if action == 'Approve':
+        try:
+            available = proof_available(task.proof_image_path)
+        except OSError:
+            return _error('Proof storage is unavailable. Please retry.', 503)
+        if not available:
+            return _error('Proof image is unavailable. Completion cannot be approved without stored proof.', 409)
     try:
         approved = action == 'Approve'
         transition(task, 'Completed' if approved else 'On Site', 'Completed' if approved else 'On Site',

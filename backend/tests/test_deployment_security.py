@@ -186,12 +186,13 @@ class DeploymentSecurityTests(unittest.TestCase):
                 save_proof(upload())
             decoder.assert_not_called()
 
-    def test_static_deployment_config_publishes_only_frontend_and_mounts_private_data(self):
+    def test_static_deployment_config_uses_free_cloud_backends(self):
         import tomllib
         import yaml  # Existing flasgger dependency; no extra package installation.
         root=Path(__file__).resolve().parents[2]
         netlify=tomllib.loads((root/'netlify.toml').read_text())
-        self.assertEqual(netlify['build']['publish'],'frontend')
+        self.assertEqual(netlify['build']['publish'],'dist')
+        self.assertIn('build-netlify.cjs',netlify['build']['command'])
         render=yaml.safe_load((root/'render.yaml').read_text())['services'][0]
         self.assertEqual(render['rootDir'],'backend')
         self.assertIn('wsgi:application',render['startCommand'])
@@ -201,4 +202,9 @@ class DeploymentSecurityTests(unittest.TestCase):
         self.assertTrue(variables['SECRET_KEY']['generateValue'])
         self.assertEqual(variables['APP_ENV']['value'],'production')
         self.assertEqual(variables['SEED_DEMO_DATA']['value'],'False')
-        self.assertTrue(variables['UPLOAD_FOLDER']['value'].startswith(render['disk']['mountPath']+'/'))
+        self.assertEqual(render['plan'],'free')
+        self.assertNotIn('disk',render)
+        self.assertEqual(variables['STORAGE_BACKEND']['value'],'supabase')
+        for key in ('DATABASE_URL','SUPABASE_URL','SUPABASE_SECRET_KEY',
+                    'SUPABASE_STORAGE_BUCKET','CORS_ORIGINS','RATELIMIT_STORAGE_URI'):
+            self.assertTrue(variables[key]['sync'] is False)

@@ -66,3 +66,5 @@ outputs/
 *.tsbuildinfo
 npm-debug.log*
 yarn-error.log*
+# Generated Netlify output; source lives in frontend/.
+dist/

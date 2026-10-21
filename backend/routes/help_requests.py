@@ -100,7 +100,9 @@ def create_help_request():
                 return _error('Uploaded image format is not supported or file is invalid')
 
         # Estimate severity only after a valid image has been saved.
-        severity = classify_severity(image_path=img_path) if img_path else None
+        from supabase_storage import is_cloud
+        severity_source = request.files['image'].stream if img_path and is_cloud() else img_path
+        severity = classify_severity(image_path=severity_source) if img_path else None
 
         # Persist the request and finish serialization before committing.
         req = HelpRequest(
@@ -125,7 +127,8 @@ def create_help_request():
         db.session.rollback()
         if img_path:
             try:
-                Path(img_path).unlink(missing_ok=True)
+                from private_uploads import remove_incident_image
+                remove_incident_image(img_path, 'requests')
             except OSError:
                 current_app.logger.error('New SOS image cleanup failed after rollback.')
         return _error('Help request could not be saved. Please retry.', 503)
@@ -208,7 +211,10 @@ def get_help_request_image(req_id):
     if user.role != 'admin' and req.user_id != user.user_id:
         return _error('You do not have permission to view this image', 403)
     from private_uploads import private_incident_image
-    return private_incident_image(req.image_path, 'requests') or _error('Image unavailable', 404)
+    try:
+        return private_incident_image(req.image_path, 'requests') or _error('Image unavailable', 404)
+    except OSError:
+        return _error('Image storage is unavailable. Please retry.', 503)
 
 
 # ── PUT /help-request/status ───────────────────────────────────────────────────

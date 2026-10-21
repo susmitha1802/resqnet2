@@ -1,6 +1,7 @@
 """Runtime deployment guards; never logs or changes secret/account values."""
 from pathlib import Path
 import secrets
+import re
 from urllib.parse import urlsplit
 from sqlalchemy.engine import make_url
 
@@ -28,6 +29,9 @@ def validate_runtime_config(app):
     config = app.config
     if config.get('APP_ENV', 'development') not in ('development', 'production', 'testing'):
         raise RuntimeError('APP_ENV must be development, testing, or production.')
+    storage_backend = config.get('STORAGE_BACKEND', 'local')
+    if storage_backend not in {'local', 'supabase'}:
+        raise RuntimeError('STORAGE_BACKEND must be local or supabase.')
     if not is_production(config):
         for key in ('SECRET_KEY', 'JWT_SECRET_KEY'):
             if not config.get(key):
@@ -62,23 +66,41 @@ def validate_runtime_config(app):
         parsed_rate = urlsplit(rate_uri)
         if parsed_rate.scheme not in {'redis', 'rediss'} or not parsed_rate.hostname:
             raise RuntimeError('Production requires Redis-compatible RATELIMIT_STORAGE_URI; memory counters are not allowed.')
-        storage = config.get('PERSISTENT_STORAGE_PATH')
-        if not storage or not Path(storage).is_absolute():
-            raise RuntimeError('Production requires an absolute PERSISTENT_STORAGE_PATH for private uploads.')
-        root = Path(storage).resolve()
-        if config.get('RUNNING_ON_RENDER') and not root.is_mount():
-            raise RuntimeError('Render PERSISTENT_STORAGE_PATH must be an attached disk mount, not an ephemeral directory.')
-        uploads = Path(config['UPLOAD_FOLDER']).resolve()
-        if not uploads.is_relative_to(root):
-            raise RuntimeError('Production UPLOAD_FOLDER must be on persistent storage.')
-        if any(not (uploads / folder).resolve().is_relative_to(uploads)
-               for folder in ('requests', 'reports', 'task_proofs')):
-            raise RuntimeError('Private upload subdirectories cannot resolve outside UPLOAD_FOLDER.')
+        if storage_backend == 'local':
+            storage = config.get('PERSISTENT_STORAGE_PATH')
+            if not storage or not Path(storage).is_absolute():
+                raise RuntimeError('Production requires an absolute PERSISTENT_STORAGE_PATH for private uploads.')
+            root = Path(storage).resolve()
+            if config.get('RUNNING_ON_RENDER') and not root.is_mount():
+                raise RuntimeError('Render PERSISTENT_STORAGE_PATH must be an attached disk mount, not an ephemeral directory.')
+            uploads = Path(config['UPLOAD_FOLDER']).resolve()
+            if not uploads.is_relative_to(root):
+                raise RuntimeError('Production UPLOAD_FOLDER must be on persistent storage.')
+            if any(not (uploads / folder).resolve().is_relative_to(uploads)
+                   for folder in ('requests', 'reports', 'task_proofs')):
+                raise RuntimeError('Private upload subdirectories cannot resolve outside UPLOAD_FOLDER.')
+        else:
+            project = urlsplit(config.get('SUPABASE_URL', ''))
+            if (project.scheme != 'https' or project.port not in (None, 443)
+                    or not re.fullmatch(r'[a-z0-9-]+\.supabase\.co', project.hostname or '')
+                    or project.path or project.query or project.fragment or project.username):
+                raise RuntimeError('Production requires a valid HTTPS SUPABASE_URL.')
+            key = config.get('SUPABASE_SECRET_KEY')
+            if not isinstance(key, str) or not key.startswith('sb_secret_') or len(key) < 32:
+                raise RuntimeError('Production requires a server-only SUPABASE_SECRET_KEY.')
+            if not re.fullmatch(r'[a-z0-9][a-z0-9_-]{1,62}', config.get('SUPABASE_STORAGE_BUCKET', '')):
+                raise RuntimeError('Production requires a private SUPABASE_STORAGE_BUCKET name.')
         database = make_url(config['SQLALCHEMY_DATABASE_URI'])
-        if database.drivername != 'sqlite':
-            raise RuntimeError('This deployment supports mounted SQLite only; another database requires a reviewed driver and migration.')
-        if database.drivername.startswith('sqlite') and (
-            not database.database or not Path(database.database).is_absolute()
-            or not Path(database.database).resolve().is_relative_to(root)
-        ):
-            raise RuntimeError('Production SQLite must be on persistent storage.')
+        if database.drivername == 'sqlite' and storage_backend == 'local':
+            if (not database.database or not Path(database.database).is_absolute()
+                    or not Path(database.database).resolve().is_relative_to(root)):
+                raise RuntimeError('Production SQLite must be on persistent storage.')
+        elif database.drivername == 'postgresql+psycopg' and storage_backend == 'supabase':
+            project_ref = project.hostname.removesuffix('.supabase.co')
+            direct = database.host == f'db.{project_ref}.supabase.co' and database.username == 'postgres'
+            pooled = (database.host or '').endswith('.pooler.supabase.com') and database.username == f'postgres.{project_ref}'
+            if (not (direct or pooled) or database.port != 5432 or not database.password or database.database != 'postgres'
+                    or database.query.get('sslmode') not in {'require', 'verify-full'}):
+                raise RuntimeError('Production requires the matching Supabase PostgreSQL URL with TLS.')
+        else:
+            raise RuntimeError('Production database and private storage backends must match.')

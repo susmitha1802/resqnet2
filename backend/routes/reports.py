@@ -4,7 +4,6 @@ POST /report-disaster
 GET  /reports
 GET  /report/<id>
 """
-from pathlib import Path
 from flask import Blueprint, request, jsonify, current_app
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from sqlalchemy.exc import SQLAlchemyError
@@ -71,7 +70,9 @@ def report_disaster():
             if not img_path:
                 return _error('Uploaded image format is not supported or file is invalid', 400)
 
-        severity = classify_severity(image_path=img_path, disaster_type=disaster_type)
+        from supabase_storage import is_cloud
+        severity_source = request.files['images'].stream if img_path and is_cloud() else img_path
+        severity = classify_severity(image_path=severity_source, disaster_type=disaster_type)
 
         report = DisasterReport(
             user_id                 = uid,
@@ -93,7 +94,8 @@ def report_disaster():
         db.session.rollback()
         if img_path:
             try:
-                Path(img_path).unlink(missing_ok=True)
+                from private_uploads import remove_incident_image
+                remove_incident_image(img_path, 'reports')
             except OSError:
                 current_app.logger.error('New report image cleanup failed after rollback.')
         return _error('Report could not be saved. Please retry.', 503)
@@ -143,4 +145,7 @@ def get_report_image(report_id):
     if user.role != 'admin' and report.user_id != user.user_id:
         return _error('You do not have permission to view this image', 403)
     from private_uploads import private_incident_image
-    return private_incident_image(report.image_path, 'reports') or _error('Image unavailable', 404)
+    try:
+        return private_incident_image(report.image_path, 'reports') or _error('Image unavailable', 404)
+    except OSError:
+        return _error('Image storage is unavailable. Please retry.', 503)

@@ -1,4 +1,5 @@
-# Review-only deployment configuration. Applying this creates paid disk resources.
+# Free preview backend. Supabase and Render Key Value are configured separately.
+# Review all dashboard values before applying; no disk/database is created here.
 services:
   - type: web
     name: resqnet-backend
@@ -7,11 +8,7 @@ services:
     buildCommand: pip install -r requirements.txt
     startCommand: gunicorn --bind 0.0.0.0:$PORT --workers 1 --threads 4 --worker-class gthread --timeout 90 wsgi:application
     healthCheckPath: /health
-    plan: starter
-    disk:
-      name: resqnet-private-data
-      mountPath: /var/data/resqnet
-      sizeGB: 1
+    plan: free
     envVars:
       - key: PYTHON_VERSION
         value: 3.12.15
@@ -21,19 +18,25 @@ services:
         value: "False"
       - key: SEED_DEMO_DATA
         value: "False"
+      - key: STORAGE_BACKEND
+        value: supabase
       - key: SECRET_KEY
         generateValue: true
       - key: JWT_SECRET_KEY
         generateValue: true
       - key: DATABASE_URL
-        value: sqlite:////var/data/resqnet/resqnet.db
-      - key: PERSISTENT_STORAGE_PATH
-        value: /var/data/resqnet
-      - key: UPLOAD_FOLDER
-        value: /var/data/resqnet/uploads
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SECRET_KEY
+        sync: false
+      - key: SUPABASE_STORAGE_BUCKET
+        sync: false
       - key: CORS_ORIGINS
-        value: https://resqnet1-2026.netlify.app
+        sync: false
       - key: RATELIMIT_STORAGE_URI
         sync: false
       - key: TRUSTED_PROXY_HOPS
+        sync: false
+      - key: ADMIN_SECRET_CODE
         sync: false

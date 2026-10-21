@@ -47,7 +47,7 @@ test('unverifiable profile fails closed and clears stale account data', async ()
   assert.match(s.context.location.href, /^auth.html/);
 });
 test('local pages default to local backend and explicit overrides are preserved', () => {
-  for (const [host, override, expected] of [['127.0.0.1',null,'http://127.0.0.1:5000'],['localhost',null,'http://127.0.0.1:5000'],['example.invalid',null,'https://resqnet-backend-y3ur.onrender.com'],['localhost','http://local-override','http://local-override']]) {
+  for (const [host, override, expected] of [['127.0.0.1',null,'http://127.0.0.1:5000'],['localhost',null,'http://127.0.0.1:5000'],['example.invalid',null,''],['example.invalid','http://stale-override',''],['localhost','http://local-override','http://local-override']]) {
     const context = { window: { location: { hostname: host } }, localStorage: { getItem: () => override } };
     vm.createContext(context); vm.runInContext(source('api.js'), context);
     assert.equal(vm.runInContext('Api.BASE', context), expected);

@@ -380,8 +380,9 @@ def create_app(config_class=Config) -> Flask:
     from security import validate_runtime_config
     validate_runtime_config(app)
 
-    # Ensure upload directory exists
-    os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+    # Cloud production never writes private evidence to Render's temporary disk.
+    if app.config.get('STORAGE_BACKEND', 'local') == 'local':
+        os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
     # ── Extensions ────────────────────────────────────────────────────────────
     db.init_app(app)
@@ -421,6 +422,10 @@ def create_app(config_class=Config) -> Flask:
 
     # ── Create Tables ─────────────────────────────────────────────────────────
     with app.app_context():
+        if (app.config.get('APP_ENV') == 'production' and not app.testing
+                and app.config.get('STORAGE_BACKEND') == 'supabase'):
+            from supabase_storage import check_private_bucket
+            check_private_bucket()
         from database import initialize_database
         initialize_database()
         from models import User

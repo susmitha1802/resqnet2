@@ -3,8 +3,12 @@
  * Centralized fetch wrapper for all backend calls
  */
 
-// Explicit local override; deployed behavior keeps its existing default.
-const API_BASE = window.RESQNET_API_BASE || localStorage.getItem('resqnet_api_base') || (["localhost", "127.0.0.1"].includes(window.location?.hostname) ? "http://127.0.0.1:5000" : "https://resqnet-backend-y3ur.onrender.com");
+// Netlify's build replaces this public URL token in its output only. No secret belongs here.
+const DEPLOYED_API_BASE = '__RESQNET_API_BASE__';
+const IS_LOCAL_FRONTEND = ["localhost", "127.0.0.1"].includes(window.location?.hostname);
+const API_BASE = IS_LOCAL_FRONTEND
+  ? (window.RESQNET_API_BASE || localStorage.getItem('resqnet_api_base') || "http://127.0.0.1:5000")
+  : (DEPLOYED_API_BASE.startsWith('https://') ? DEPLOYED_API_BASE : '');
 const Api = {
   /** Centralized base URL — use Api.BASE everywhere instead of hardcoding */
   BASE: API_BASE,
