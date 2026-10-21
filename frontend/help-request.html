@@ -26,7 +26,7 @@
     <!-- Header -->
     <div style="margin-bottom:24px">
       <h3 style="font-weight:800;margin-bottom:6px">🆘 Request Emergency Help</h3>
-      <p style="color:var(--text-secondary);font-size:0.875rem">Fill in the details below. Our AI will immediately assess the priority and assign volunteers.</p>
+      <p style="color:var(--text-secondary);font-size:0.875rem">Fill in the details below. Simple rules set SOS priority; available volunteers can accept requests.</p>
     </div>
 
     <!-- Success State -->
@@ -98,7 +98,7 @@
       <!-- Image Upload -->
       <div class="resq-card mb-20">
         <h6 style="font-weight:700;margin-bottom:4px">📸 Upload Situation Image (Optional)</h6>
-        <p style="color:var(--text-muted);font-size:0.8rem;margin-bottom:14px">AI will analyze the image for damage severity classification</p>
+        <p style="color:var(--text-muted);font-size:0.8rem;margin-bottom:14px">Images support your request. Image-based severity estimates use unvalidated rules and do not confirm damage.</p>
         <div class="file-upload-area" id="img-drop-area" onclick="document.getElementById('img-input').click()">
           <div class="file-upload-icon">🖼️</div>
           <div class="file-upload-text">Drag image here or <span>Browse</span></div>
@@ -118,6 +118,7 @@
         <div style="position:relative;margin-bottom:10px">
           <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--text-muted);pointer-events:none">🔍</span>
           <input id="loc-search-input" class="resq-input" placeholder="Search address…" autocomplete="off" style="padding-left:36px">
+          <button type="button" id="loc-search-input-button" class="btn-resq-outline">Search address</button>
           <div id="loc-search-results" style="display:none;position:absolute;top:calc(100% + 6px);left:0;right:0;background:var(--bg-card);border:1px solid rgba(255,45,85,0.2);border-radius:var(--radius-sm);z-index:1000;max-height:200px;overflow-y:auto;box-shadow:var(--shadow-lg)"></div>
         </div>
         <!-- Map -->
@@ -146,18 +147,18 @@
     </form>
   </div>
 
-  <!-- Sidebar: AI Preview + Info Cards -->
+  <!-- Sidebar: Priority Preview + Info Cards -->
   <div style="position:sticky;top:74px;height:fit-content">
-    <!-- AI Preview Panel -->
+    <!-- Rule-based Priority Preview Panel -->
     <div id="ai-preview-panel" style="display:none;margin-bottom:18px">
       <div class="ai-panel">
-        <div class="ai-panel-title">🤖 AI PREVIEW</div>
+        <div class="ai-panel-title">Rule-based priority preview</div>
         <div class="ai-metric">
-          <span class="ai-metric-label">🚨 Predicted Priority</span>
+          <span class="ai-metric-label">🚨 Local estimate; server sets final priority</span>
           <span class="ai-metric-value" id="ai-priority-level" style="font-size:1rem;font-weight:800">—</span>
         </div>
         <div style="color:var(--text-muted);font-size:0.75rem;margin:6px 0 14px;padding:8px;background:rgba(255,255,255,0.03);border-radius:var(--radius-sm)" id="ai-priority-reason"></div>
-        <div class="ai-panel-title" style="margin-top:6px">📦 Resource Forecast</div>
+        <div class="ai-panel-title" style="margin-top:6px">📦 Resource estimate</div>
         <div class="ai-metric">
           <span class="ai-metric-label">🍱 Food</span>
           <span class="ai-metric-value" id="ai-food-forecast" style="font-size:0.8rem">—</span>
@@ -205,7 +206,7 @@
     </div>
 
     <div class="resq-alert info">
-      ℹ️ <span>High Priority requests are responded to within <strong>15 minutes</strong> on average.</span>
+      ℹ️ <span>High Priority requests are flagged for urgent review. Response times depend on available responders.</span>
     </div>
   </div>
 
@@ -229,7 +230,7 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="js/api.js"></script>
 <script src="js/main.js"></script>
-<script src="js/leaflet-map.js?v=location-1"></script>
+<script src="js/leaflet-map.js?v=geocode-2"></script>
 <script src="js/help-request.js?v=location-1"></script>
 <script>
   function selectType(type) {

@@ -56,10 +56,10 @@ async function main() {
       } else if (message.method === 'Fetch.requestPaused') {
         const { requestId, request } = message.params;
         let body, type;
-        if (request.url.includes('nominatim.openstreetmap.org')) {
-          body = JSON.stringify(request.url.includes('/search')
+        if (request.url.includes('/geocode?')) {
+          body = JSON.stringify({ success: true, result: request.url.includes('kind=search')
             ? [{ lat: '28.6139', lon: '77.2090', display_name: 'New Delhi, India' }]
-            : mode === 'lookup-failure' ? { error: 'unavailable' } : { display_name: 'Mock Road, Mock Town, Mock State' });
+            : { display_name: 'Mock Road, Mock Town, Mock State' } });
           type = 'application/json';
         } else if (request.url.includes('/map/data')) {
           body = JSON.stringify({ success: true, requests: [{ request_id: 1, request_type: 'Food', priority_level: 'Medium',
@@ -76,7 +76,11 @@ async function main() {
               description: 'Manual observation', source: 'Manual', status: 'Active alert' }
           ] }); type = 'application/json';
         } else if (request.url.includes('/ngo/locations')) {
-          body = JSON.stringify({ locations: [] }); type = 'application/json';
+          body = JSON.stringify({ locations: [
+            { name: 'Valid depot', latitude: 0, longitude: 0 },
+            { name: 'Unknown depot', latitude: null, longitude: null },
+            { name: 'Invalid depot', latitude: 999, longitude: 77 }
+          ] }); type = 'application/json';
         } else if (/tile\.openstreetmap\.org|basemaps\.cartocdn\.com/.test(request.url)) {
           body = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl6JXcAAAAASUVORK5CYII=', 'base64');
           type = 'image/png';
@@ -90,7 +94,7 @@ async function main() {
       }
     });
     await send('Page.enable');
-    await send('Fetch.enable', { patterns: ['*nominatim.openstreetmap.org*', '*tile.openstreetmap.org*', '*basemaps.cartocdn.com*',
+    await send('Fetch.enable', { patterns: ['*/geocode?*', '*tile.openstreetmap.org*', '*basemaps.cartocdn.com*',
       '*/map/data*', '*/map/risk-zones*', '*/ngo/locations*'].map(urlPattern => ({ urlPattern })) });
     await send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
     await send('Emulation.setGeolocationOverride', { latitude: 17.4401, longitude: 78.4487, accuracy: 5 });
@@ -142,19 +146,28 @@ async function main() {
     assert.ok(Math.abs(await evaluate('map.getCenter().lat') - 20.5937) < .01);
     assert.equal(await evaluate(`(() => { let demo=false; map.eachLayer(l=>{if(l.getPopup && String(l.getPopup()?.getContent()).includes('Severe flash flooding')) demo=true;});return demo; })()`), false);
     assert.match(await evaluate(`document.querySelector('.flood-panel').textContent`), /Unvalidated results/);
-    console.log('PASS browser: live map country overview, legacy demo alert hidden, Flood Intelligence warning retained');
+    for (let n = 0; n < 100; n++) {
+      if (await evaluate(`(() => { let found=false; map.eachLayer(l=>{if(l.getPopup && String(l.getPopup()?.getContent()).includes('Valid depot')) found=true;}); return found; })()`)) break;
+      await delay(100);
+    }
+    const depots = await evaluate(`(() => {const names=[];map.eachLayer(l=>{if(l.getPopup) names.push(String(l.getPopup()?.getContent()));});return names.join(' ');})()`);
+    assert.match(depots, /Valid depot/);
+    assert.doesNotMatch(depots, /Unknown depot|Invalid depot/);
+    console.log('PASS browser: live map overview, valid-only NGO markers, legacy demo alert hidden, Flood Intelligence warning retained');
 
     await send('Page.navigate', { url: `${origin}/map.html?report_id=2` });
     for (let n = 0; n < 100; n++) {
       if (await evaluate(`window._foundTargetMarker === true && !!document.querySelector('.leaflet-popup-content')`)) break;
       await delay(100);
     }
-    assert.ok(Math.abs(await evaluate('map.getCenter().lat') - 12.9716) < .01);
+    const linkedState = await evaluate(`({center:map.getCenter(),found:window._foundTargetMarker})`);
+    assert.equal(linkedState.found, true, 'Linked report marker did not render');
+    assert.ok(Math.abs(linkedState.center.lat - 12.9716) < .01);
     const popup = await evaluate(`document.querySelector('.leaflet-popup-content').textContent`);
     assert.match(popup, /12\.97160, 77\.59460/);
     assert.match(popup, /not independently verified/);
     assert.match(popup, /Community incident report/);
-    await evaluate(`(() => {const input=document.getElementById('map-search-input');input.value='New Delhi';input.dispatchEvent(new Event('input',{bubbles:true}));})()`);
+    await evaluate(`(() => {const input=document.getElementById('map-search-input');input.value='New Delhi';document.getElementById('map-search-input-button').click();})()`);
     for (let n = 0; n < 50; n++) {
       if (await evaluate(`!!document.querySelector('#map-search-results [data-idx]')`)) break;
       await delay(100);
@@ -166,6 +179,19 @@ async function main() {
     assert.ok(Math.abs(await evaluate('map.getCenter().lat') - 28.6139) < .01);
     assert.ok(Math.abs(await evaluate('map.getCenter().lng') - 77.209) < .01);
     console.log('PASS browser: outside-Hyderabad popup matches its record; address selection survives data refresh and filters');
+
+    await send('Page.navigate', { url: `${origin}/map.html?request_id=1` });
+    for (let n = 0; n < 100; n++) {
+      if (await evaluate(`window._foundTargetMarker === true && !!document.querySelector('.leaflet-popup-content')`)) break;
+      await delay(100);
+    }
+    assert.equal(await evaluate('window._foundTargetMarker'), true, 'Linked SOS marker did not render');
+    assert.ok(Math.abs(await evaluate('map.getCenter().lat') - 9.9312) < .01);
+    assert.match(await evaluate(`document.querySelector('.leaflet-popup-content').textContent`), /9\.93120, 76\.26730/);
+    await evaluate(`(async()=>{map.fire('dragstart');map.panTo([19.076,72.8777],{animate:false});await loadMapData();applyMapFilter('Disasters');await loadMapData();})()`);
+    assert.ok(Math.abs(await evaluate('map.getCenter().lat') - 19.076) < .01);
+    assert.ok(Math.abs(await evaluate('map.getCenter().lng') - 72.8777) < .01);
+    console.log('PASS browser: linked SOS centers on its record; panning survives refresh and filtering');
   } finally {
     if (send && ws?.readyState === WebSocket.OPEN) await send('Browser.close').catch(() => {});
     ws?.close();

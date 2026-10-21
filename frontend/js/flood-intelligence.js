@@ -82,7 +82,10 @@ window.FloodIntelligence = (() => {
         load.disabled = true;
         status.textContent = 'Loading historical event results…';
         try {
-          const s = await get('summary');
+          const [s, metadata] = await Promise.all([get('summary'), get('metadata')]);
+          if (metadata.event_id !== EVENT || s.event_id !== EVENT || metadata.event_date !== s.event_date) {
+            throw new Error('Event metadata does not match the summary');
+          }
           summary.replaceChildren();
           bbox = s.aoi_bbox_epsg4326;
           focus.disabled = !Array.isArray(bbox) || bbox.length !== 4;
@@ -92,6 +95,9 @@ window.FloodIntelligence = (() => {
           metric('Road overlap', s.exposure.roads.candidate_overlap_length_m, ' m', 1);
           metric('Bridges · potential', s.exposure.bridges.potentially_exposed);
           date.textContent = `Historical event: ${s.event_date} · ${EVENT}`;
+          const pair = metadata.acquisition_pair || {};
+          line(`Sentinel-1 observations: before ${pair.before_acquisition || 'unavailable'}; after ${pair.after_acquisition || 'unavailable'}. The event date is a reference date, not an observation or forecast date.`);
+          line(`Coverage (EPSG:4326 west, south, east, north): ${(metadata.aoi_bbox_epsg4326 || []).join(', ')}. Map geometries are simplified for display; measurements come from the processed source data.`);
           line(`Candidate: ${s.candidate.pixels} pixels / ${s.candidate.area_km2} km². Potential road exposure: ${s.exposure.roads.candidate_intersecting} road ways.`);
           line(`Hypothetical network: ${s.network.hypothetical_disruption.affected_physical_edges} removed physical segments. This is a scenario, not observed closures.`);
           line(`Scientific status: ${Object.entries(s.scientific_status).map(([k, v]) => `${k}=${v}`).join('; ')}.`);

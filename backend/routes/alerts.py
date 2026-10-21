@@ -16,7 +16,9 @@ from routes.middleware import require_role
 from extensions import db
 from models import User, WeatherAlert, PreparednessPing
 from map_provenance import demo_alert, demo_alert_filter
-from sqlalchemy import or_
+from sqlalchemy import or_, update
+from sqlalchemy.exc import SQLAlchemyError
+from input_validation import coordinates
 
 alerts_bp = Blueprint('alerts', __name__)
 
@@ -71,20 +73,23 @@ def create_alert():
     user = User.query.get(uid)
     if not user or user.role != 'admin':
         return jsonify({'success': False, 'message': 'Admin only'}), 403
-    data = request.get_json() or {}
-    if (data.get('alert_type', 'Other') not in {'Cyclone', 'Flood', 'Heatwave', 'Storm', 'Earthquake', 'Other'}
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return jsonify(success=False, message='A JSON object is required.'), 400
+    if (not isinstance(data.get('alert_type', 'Other'), str)
+            or data.get('alert_type', 'Other') not in {'Cyclone', 'Flood', 'Heatwave', 'Storm', 'Earthquake', 'Other'}
+            or not isinstance(data.get('severity', 'Watch'), str)
             or data.get('severity', 'Watch') not in {'Watch', 'Warning', 'Emergency'}
             or not isinstance(data.get('description'), str) or not data['description'].strip()
             or len(data['description']) > 4000):
         return jsonify(success=False, message='A valid alert type, severity and description are required.'), 400
     try:
-        lat = float(data.get('affected_lat', DEFAULT_LAT)); lng = float(data.get('affected_lng', DEFAULT_LNG))
+        lat, lng = coordinates(data.get('affected_lat', DEFAULT_LAT),
+                               data.get('affected_lng', DEFAULT_LNG))
         radius = data.get('affected_radius_km', 50)
-        if not math.isfinite(lat) or not math.isfinite(lng) or not -90 <= lat <= 90 or not -180 <= lng <= 180:
-            raise ValueError()
         if type(radius) is not int or not 1 <= radius <= 500:
             raise ValueError()
-    except (TypeError, ValueError):
+    except ValueError:
         return jsonify(success=False, message='Valid coordinates and a radius from 1 to 500 km are required.'), 400
     alert = WeatherAlert(
         alert_type         = data.get('alert_type', 'Other'),
@@ -95,8 +100,12 @@ def create_alert():
         source             = 'Manual',
         affected_radius_km = radius,
     )
-    db.session.add(alert)
-    db.session.commit()
+    try:
+        db.session.add(alert)
+        db.session.commit()
+    except SQLAlchemyError:
+        db.session.rollback()
+        return jsonify(success=False, message='Alert could not be saved. Please retry.'), 503
     return jsonify({'success': True, 'alert': alert.to_dict()}), 201
 
 # ── GET /weather/live ──────────────────────────────────────────────────────────
@@ -230,16 +239,33 @@ def notify_responders(alert_id):
         return jsonify({'success': False, 'message': 'Demo alerts cannot send live preparedness notifications.'}), 409
     if alert.expires_at and alert.expires_at.replace(tzinfo=timezone.utc) <= datetime.now(timezone.utc):
         return jsonify(success=False, message='Expired alerts cannot notify responders.'), 409
-    nearby = _users_in_radius(float(alert.affected_lat), float(alert.affected_lng), alert.affected_radius_km)
-    count = 0
-    for u in nearby:
-        exists = db.session.query(PreparednessPing.ping_id).filter_by(alert_id=alert_id, user_id=u.user_id).first()
-        if not exists:
-            db.session.add(PreparednessPing(alert_id=alert_id, user_id=u.user_id))
-            count += 1
-    alert.notified_at = datetime.now(timezone.utc)
-    db.session.commit()
-    return jsonify({'success': True, 'pings_sent': count}), 200
+    by_role = {'volunteer': 0, 'ngo': 0}
+    already_recorded = 0
+    try:
+        # Serialize competing attempts for this advisory without a schema change.
+        claimed = db.session.execute(update(WeatherAlert).where(
+            WeatherAlert.alert_id == alert_id, WeatherAlert.notified_at == alert.notified_at
+        ).values(notified_at=datetime.now(timezone.utc))).rowcount
+        if claimed != 1:
+            db.session.rollback()
+            return jsonify(success=False, message='Advisory changed. Reload before retrying.'), 409
+        nearby = _users_in_radius(float(alert.affected_lat), float(alert.affected_lng), alert.affected_radius_km)
+        for u in nearby:
+            exists = db.session.query(PreparednessPing.ping_id).filter_by(alert_id=alert_id, user_id=u.user_id).first()
+            if exists:
+                already_recorded += 1
+            else:
+                db.session.add(PreparednessPing(alert_id=alert_id, user_id=u.user_id))
+                by_role[u.role] += 1
+        db.session.commit()
+    except SQLAlchemyError:
+        db.session.rollback()
+        return jsonify(success=False, message='In-app alerts could not be recorded. Reload before retrying.'), 503
+    count = sum(by_role.values())
+    return jsonify(success=True, pings_sent=count, pings_created=count, by_role=by_role,
+                   already_recorded=already_recorded,
+                   recipient_scope='Nearby volunteers and NGOs with saved coordinates',
+                   delivery='In-app records only; no external delivery or acknowledgement confirmed.'), 200
 
 # ── GET /alerts/<id>/responses ─────────────────────────────────────────────────
 @alerts_bp.route('/alerts/<int:alert_id>/responses', methods=['GET'])

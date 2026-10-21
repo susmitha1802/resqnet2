@@ -9,6 +9,7 @@ from flask import Blueprint, request, jsonify, send_file
 from flask_jwt_extended import get_jwt_identity
 from sqlalchemy import update
 from sqlalchemy.exc import SQLAlchemyError
+from input_validation import coordinates
 
 from extensions import db
 from models import HelpRequest, Volunteer, ReliefTask, User
@@ -54,7 +55,9 @@ def get_volunteer_tasks():
 @require_role('volunteer')
 def accept_task():
     uid  = int(get_jwt_identity())
-    data = request.get_json(silent=True) or {}
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return _error('A JSON object is required')
     req_id = data.get('request_id')
 
     if type(req_id) is not int or req_id <= 0:
@@ -95,11 +98,17 @@ def accept_task():
         return _error('Request or volunteer is no longer available. Refresh and try again.', 409)
 
     task = ReliefTask(volunteer_id=vol.volunteer_id, request_id=req_id, status='Assigned')
+    try:
+        db.session.add(task)
+        # User has only available/unavailable; an assigned volunteer cannot accept another task.
+        vol.user.availability = 'unavailable'
+        db.session.commit()
+    except SQLAlchemyError:
+        db.session.rollback()
+        return _error('Task could not be accepted. Please retry.', 503)
 
-    db.session.add(task)
-    db.session.commit()
-
-    return _success({'task': task.to_dict(), 'request': req.to_dict()}, 'Task accepted successfully')
+    from access import request_view
+    return _success({'task': task.to_dict(), 'request': request_view(req, vol.user)}, 'Task accepted successfully')
 
 
 # ── PUT /volunteer/update-status ───────────────────────────────────────────────
@@ -107,8 +116,10 @@ def accept_task():
 @require_role('volunteer')
 def update_volunteer_status():
     uid  = int(get_jwt_identity())
-    data = request.get_json(silent=True) or {}
-    status = data.get('status', '').strip()
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return _error('A JSON object is required')
+    status = data.get('status')
 
     valid = ('available', 'unavailable', 'on_task')
     if status not in valid:
@@ -122,8 +133,16 @@ def update_volunteer_status():
                                      ReliefTask.status.in_(ACTIVE_TASK_STATES)).first()
     if active and status != 'on_task':
         return _error('Finish your assigned task and admin verification before changing availability.', 409)
-    vol.availability_status = status
-    db.session.commit()
+    if not active and status == 'on_task':
+        return _error('On Task requires an active assignment.', 409)
+    try:
+        vol.availability_status = status
+        user = db.session.get(User, uid)
+        user.availability = 'available' if status == 'available' else 'unavailable'
+        db.session.commit()
+    except SQLAlchemyError:
+        db.session.rollback()
+        return _error('Availability could not be saved. Please retry.', 503)
     return _success({'volunteer': vol.to_dict()}, 'Availability updated')
 
 
@@ -132,20 +151,28 @@ def update_volunteer_status():
 @require_role('volunteer')
 def update_volunteer_location():
     uid  = int(get_jwt_identity())
-    data = request.get_json(silent=True) or {}
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return _error('A JSON object is required')
     lat  = data.get('latitude')
     lng  = data.get('longitude')
 
-    if lat is None or lng is None:
-        return _error('latitude and longitude are required')
+    try:
+        lat, lng = coordinates(lat, lng)
+    except ValueError:
+        return _error('latitude and longitude must be finite numbers in range')
 
     vol = _get_volunteer(uid)
     if not vol:
         return _error('You are not registered as a volunteer', 403)
 
-    vol.last_location_lat = lat
-    vol.last_location_lng = lng
-    db.session.commit()
+    try:
+        vol.last_location_lat = lat
+        vol.last_location_lng = lng
+        db.session.commit()
+    except SQLAlchemyError:
+        db.session.rollback()
+        return _error('Location could not be saved. Please retry.', 503)
     return _success({'volunteer': vol.to_dict()}, 'Location updated')
 
 

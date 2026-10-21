@@ -11,7 +11,7 @@ from PIL import Image
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy import text
 from extensions import db
-from models import HelpRequest, ReliefTask, Volunteer
+from models import HelpRequest, ReliefTask, Volunteer, User
 from routes.admin import admin_bp
 from routes.help_requests import help_bp
 from sos_lifecycle import proof_file
@@ -138,6 +138,7 @@ class LifecycleTests(unittest.TestCase):
             self.assertEqual(self.progress('Completed', role).status_code, 403)
         self.assertEqual(self.review().status_code, 200)
         self.assertEqual(self.snapshot(), ('Completed', 'Completed', 'Approved', 'available', 1))
+        self.assertEqual(db.session.get(User, self.users['volunteer']).availability, 'available')
         task = db.session.get(ReliefTask, self.task_id)
         self.assertEqual(task.verified_by_admin_id, self.users['admin'])
         self.assertIsNotNone(task.completed_at)
@@ -150,6 +151,7 @@ class LifecycleTests(unittest.TestCase):
         self.upload()
         self.assertEqual(self.review('Reject').status_code, 200)
         self.assertEqual(self.snapshot(), ('On Site', 'On Site', 'Rejected', 'on_task', 0))
+        self.assertEqual(db.session.get(User, self.users['volunteer']).availability, 'unavailable')
         result = self.client.get(f'/help-request/{self.request_id}', headers=self.headers('citizen'))
         self.assertIn('rejected', result.json['request']['progress_status'])
         self.assertEqual(self.review('Reject').status_code, 409)

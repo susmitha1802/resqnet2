@@ -99,8 +99,10 @@ function initFileUpload() {
   fileInput.addEventListener('change', () => handleFiles([...fileInput.files]));
 
   function handleFiles(files) {
+    if (files.length > 1) { Toast.show('Choose one image only', 'warning'); return; }
     files.forEach(file => {
-      if (uploadedFiles.length >= 5) { Toast.show('Maximum 5 files allowed', 'warning'); return; }
+      if (uploadedFiles.length >= 1) { Toast.show('Remove the current image before choosing another', 'warning'); return; }
+      if (!['image/png', 'image/jpeg'].includes(file.type)) { Toast.show('Use a JPG or PNG image', 'warning'); return; }
       if (file.size > 10 * 1024 * 1024) { Toast.show(`${file.name} exceeds 10MB limit`, 'danger'); return; }
       uploadedFiles.push(file);
       renderPreviews();
@@ -171,67 +173,14 @@ async function handleReportSubmit(e) {
   document.getElementById('report-form').style.display = 'none';
   document.getElementById('success-state').style.display = 'flex';
 
-  // Inject AI prediction if available
-  if (data?.report?.predicted_disaster_type && data.report.predicted_disaster_type !== 'Unknown') {
-    const aiPred = data.report.predicted_disaster_type;
-    const aiConf = data.report.prediction_confidence;
-    const aiMismatch = data.report.ai_mismatch;
-    const userType = selectedDisasterType;
-    
-    document.getElementById('ai-prediction-text').textContent = aiPred;
-    document.getElementById('ai-reporter-type').textContent = userType;
-    document.getElementById('ai-confidence-pct').textContent = aiConf + '%';
-    
-    // Confidence Bar styling
-    const bar = document.getElementById('ai-confidence-bar');
-    const lbl = document.getElementById('ai-confidence-label');
-    bar.style.width = aiConf + '%';
-    bar.className = 'ai-conf-fill';
-    
-    if (aiConf >= 80) {
-      bar.classList.add('high');
-      lbl.textContent = 'High';
-    } else if (aiConf >= 50) {
-      bar.classList.add('medium');
-      lbl.textContent = 'Medium';
-    } else {
-      bar.classList.add('low');
-      lbl.textContent = 'Low';
-    }
-    
-    // Status Badge
-    const badge = document.getElementById('ai-status-badge');
-    if (aiMismatch) {
-      badge.className = 'ai-badge mismatch';
-      badge.innerHTML = '⚠ AI prediction differs';
-    } else {
-      badge.className = 'ai-badge verified';
-      badge.innerHTML = '✅ AI agrees with report';
-    }
-    
-    // Display uploaded image in AI card
-    if (uploadedFiles.length > 0) {
-      const imgEl = document.getElementById('ai-uploaded-img');
-      imgEl.src = URL.createObjectURL(uploadedFiles[0]);
-      imgEl.style.display = 'block';
-    }
-
-    document.getElementById('ai-result-box').style.display = 'block';
-  } else if (data?.ai_note) {
-    document.getElementById('ai-prediction-text').textContent = 'AI analysis not available';
-    const confTrack = document.querySelector('.ai-conf-track');
-    if (confTrack) confTrack.style.display = 'none';
-    document.getElementById('ai-confidence-pct').textContent = 'N/A';
-    document.getElementById('ai-reporter-type').textContent = selectedDisasterType;
-    
-    const badge = document.getElementById('ai-status-badge');
-    badge.className = 'ai-badge medium';
-    badge.innerHTML = 'ℹ Manual Review Needed';
-
-    const noteEl = document.getElementById('ai-note-text');
-    if (noteEl) { noteEl.textContent = data.ai_note; noteEl.style.display = 'block'; }
-    document.getElementById('ai-result-box').style.display = 'block';
-  }
+  // Legacy prediction fields are not independent inference or measured confidence.
+  document.getElementById('ai-prediction-text').textContent =
+    `Community-reported: ${data.report?.disaster_type || selectedDisasterType}`;
+  document.getElementById('report-severity-text').textContent =
+    `Rule-based severity estimate: ${data.report?.severity || data.severity || 'Unavailable'}`;
+  document.getElementById('ai-note-text').textContent =
+    'Not independently verified. The severity estimate uses unvalidated image-color/type rules.';
+  document.getElementById('ai-result-box').style.display = 'block';
 
   const mapLink = document.getElementById('success-map-link');
   if (mapLink && data?.report?.report_id) {

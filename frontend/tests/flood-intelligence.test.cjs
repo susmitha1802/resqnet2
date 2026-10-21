@@ -20,13 +20,17 @@ class Element {
 function setup() {
   const controls = [], overlays = [], requests = [];
   const summary = {
-    event_date: '2024-07-30', aoi_bbox_epsg4326: [75, 9, 77, 11], candidate: { pixels: 7, area_km2: 0.1 },
+    event_id: 'kerala-discovery-check',
+    event_date: '2024-08-20', aoi_bbox_epsg4326: [75, 9, 77, 11], candidate: { pixels: 7, area_km2: 0.1 },
     exposure: { buildings: { candidate_intersecting: 2 }, roads: { candidate_intersecting: 3, candidate_overlap_length_m: 4 }, bridges: { potentially_exposed: 1 } },
     network: { hypothetical_disruption: { affected_physical_edges: 5 } },
     scientific_status: { level7: 'NOT_READY', confirmed_flood: false },
     optical_evidence: { categories: { SUPPORTED: { pixels: 0 } } },
     availability: { settlements: { available: false, reason: 'No verified settlements' }, ai: { available: false, reason: 'No model' } }, warnings: ['Experimental'],
   };
+  const metadata = { event_id: summary.event_id, event_date: summary.event_date,
+    aoi_bbox_epsg4326: summary.aoi_bbox_epsg4326,
+    acquisition_pair: { before_acquisition: '2024-08-13T00:41:18Z', after_acquisition: '2024-08-25T00:41:18Z' } };
   let fail = false;
   const context = {
     window: {}, WeakSet, AbortController, setTimeout, clearTimeout, Api: { BASE: 'http://local-backend' },
@@ -39,14 +43,14 @@ function setup() {
     fetch: async url => {
       requests.push(url);
       if (fail) return { ok: false, json: async () => ({ error: 'Unavailable' }) };
-      return { ok: true, json: async () => url.endsWith('/summary') ? summary : {
+      return { ok: true, json: async () => url.endsWith('/summary') ? summary : url.endsWith('/metadata') ? metadata : {
         type: 'FeatureCollection', features: [{}], next_offset: url.includes('offset=0') ? 1 : null,
       } };
     },
   };
   vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../js/flood-intelligence.js'), 'utf8'), context);
   const map = { fitBounds(bounds) { this.bounds = bounds; }, removeLayer(layer) { this.removed = layer; } };
-  return { context, controls, overlays, requests, map, fail: () => { fail = true; } };
+  return { context, controls, overlays, requests, map, metadata, fail: () => { fail = true; } };
 }
 
 test('reuse map, opt-in loading, bounded pagination, toggles, uncertainty and errors', async () => {
@@ -61,6 +65,10 @@ test('reuse map, opt-in loading, bounded pagination, toggles, uncertainty and er
   assert.match(lines, /NOT_READY/);
   assert.match(lines, /not observed closures/);
   assert.match(lines, /No verified settlements/);
+  assert.match(lines, /2024-08-13T00:41:18Z/);
+  assert.match(lines, /2024-08-25T00:41:18Z/);
+  assert.match(lines, /not an observation or forecast date/);
+  assert.match(lines, /EPSG:4326/);
   assert.equal(s.map.bounds, undefined);
   panel.querySelector('[data-focus]').onclick();
   assert.equal(s.map.bounds.length, 2);
@@ -84,4 +92,15 @@ test('reuse map, opt-in loading, bounded pagination, toggles, uncertainty and er
   await panel.querySelector('[data-load]').onclick();
   assert.match(panel.querySelector('[data-status]').textContent, /unavailable/);
   assert.equal(panel.querySelector('[data-load]').disabled, false);
+});
+
+test('mismatched metadata cannot enable historical layers', async () => {
+  const s = setup();
+  s.metadata.event_date = 'other';
+  s.context.window.FloodIntelligence.attach(s.map);
+  const panel = s.controls[0].panel;
+  await panel.querySelector('[data-load]').onclick();
+  assert.match(panel.querySelector('[data-status]').textContent, /does not match/);
+  for (const row of panel.querySelector('[data-layers]').children) assert.equal(row.children[0].children[0].disabled, true);
+  assert.equal(s.map.bounds, undefined);
 });

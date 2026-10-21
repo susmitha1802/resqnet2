@@ -6,11 +6,13 @@ GET  /help-request/<id>     — get single request
 PUT  /help-request/status   — update status (volunteer/admin/ngo)
 """
 import os
+from pathlib import Path
 from flask import Blueprint, request, jsonify, current_app
 from flask_jwt_extended import get_jwt_identity
 from werkzeug.utils import secure_filename
 from sqlalchemy import update
 from sqlalchemy.exc import SQLAlchemyError
+from input_validation import coordinates, positive_integer
 from sos_lifecycle import TransitionConflict, transition, ACTIVE_TASK_STATES
 
 from access import request_view, can_view_private_request
@@ -56,10 +58,9 @@ def create_help_request():
         return _error('Invalid latitude, longitude, or number_of_people')
 
     try:
-        latitude  = float(lat_val)
-        longitude = float(lng_val)
-        people    = max(1, int(people_raw))
-    except (TypeError, ValueError):
+        latitude, longitude = coordinates(lat_val, lng_val, form=True)
+        people = positive_integer(people_raw, form=True)
+    except ValueError:
         return _error('Invalid latitude, longitude, or number_of_people')
 
     if not all([name, contact, request_type]):
@@ -67,6 +68,8 @@ def create_help_request():
 
     if len(name) > 100:
         return _error('Name must be 100 characters or fewer')
+    if len(contact) > 20:
+        return _error('Contact must be 20 characters or fewer')
     if len(description) > 2000:
         return _error('Description must be 2000 characters or fewer')
 
@@ -88,33 +91,48 @@ def create_help_request():
 
     # ── Upload image ─────────────────────────────────────────────────────────
     img_path = None
-    if 'image' in request.files:
-        img_path = _save_file(request.files['image'], 'requests')
+    if len(request.files.getlist('image')) > 1:
+        return _error('Only one SOS image is supported')
+    try:
+        if 'image' in request.files:
+            img_path = _save_file(request.files['image'], 'requests')
+            if not img_path:
+                return _error('Uploaded image format is not supported or file is invalid')
 
-    # ── AI: Damage Severity (if image provided) ───────────────────────────────
-    severity = classify_severity(image_path=img_path) if img_path else None
+        # Estimate severity only after a valid image has been saved.
+        severity = classify_severity(image_path=img_path) if img_path else None
 
-    # ── Persist ───────────────────────────────────────────────────────────────
-    req = HelpRequest(
-        user_id          = uid,
-        name             = name,
-        contact          = contact,
-        request_type     = request_type,
-        priority_level   = priority,
-        number_of_people = people,
-        description      = description,
-        image_path       = img_path,
-        is_duplicate     = is_dup,
-        status           = 'Duplicate' if is_dup else 'Pending',
-        latitude         = latitude,
-        longitude        = longitude,
-    )
-    db.session.add(req)
-    db.session.commit()
+        # Persist the request and finish serialization before committing.
+        req = HelpRequest(
+            user_id          = uid,
+            name             = name,
+            contact          = contact,
+            request_type     = request_type,
+            priority_level   = priority,
+            number_of_people = people,
+            description      = description,
+            image_path       = img_path,
+            is_duplicate     = is_dup,
+            status           = 'Duplicate' if is_dup else 'Pending',
+            latitude         = latitude,
+            longitude        = longitude,
+        )
+        db.session.add(req)
+        db.session.flush()
+        result = request_view(req, db.session.get(User, uid))
+        db.session.commit()
+    except (SQLAlchemyError, OSError):
+        db.session.rollback()
+        if img_path:
+            try:
+                Path(img_path).unlink(missing_ok=True)
+            except OSError:
+                current_app.logger.error('New SOS image cleanup failed after rollback.')
+        return _error('Help request could not be saved. Please retry.', 503)
 
     return _success(
         {
-            'request': req.to_dict(),
+            'request': result,
             'ai': {
                 'priority':     priority,
                 'is_duplicate': is_dup,
@@ -182,15 +200,28 @@ def get_help_request(req_id):
     return _success({'request': request_view(req, user)})
 
 
+@help_bp.route('/help-request/<int:req_id>/image', methods=['GET'])
+@require_any_role(['reporter', 'volunteer', 'ngo', 'admin'])
+def get_help_request_image(req_id):
+    req = db.get_or_404(HelpRequest, req_id)
+    user = db.get_or_404(User, int(get_jwt_identity()))
+    if user.role != 'admin' and req.user_id != user.user_id:
+        return _error('You do not have permission to view this image', 403)
+    from private_uploads import private_incident_image
+    return private_incident_image(req.image_path, 'requests') or _error('Image unavailable', 404)
+
+
 # ── PUT /help-request/status ───────────────────────────────────────────────────
 @help_bp.route('/help-request/status', methods=['PUT'])
 @require_any_role(['volunteer', 'admin'])  # Reporters cannot change status
 def update_request_status():
     uid  = int(get_jwt_identity())
     user = db.get_or_404(User, uid)
-    data   = request.get_json(silent=True) or {}
+    data   = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return _error('A JSON object is required')
     req_id = data.get('request_id')
-    status = data.get('status', '').strip()
+    status = data.get('status')
 
     valid_statuses = ('Pending', 'Accepted', 'En Route', 'On Site', 'Completed', 'Duplicate')
     if status not in valid_statuses:
@@ -217,7 +248,7 @@ def update_request_status():
         }:
             changed = db.session.execute(update(HelpRequest).where(
                 HelpRequest.request_id == req_id, HelpRequest.status == req.status
-            ).values(status=status)).rowcount
+            ).values(status=status, is_duplicate=(status == 'Duplicate'))).rowcount
             if changed != 1:
                 raise TransitionConflict('Request changed. Refresh and try again.')
         else:
@@ -227,4 +258,4 @@ def update_request_status():
         db.session.rollback()
         return _error(str(exc) if isinstance(exc, TransitionConflict) else 'Progress could not be saved. Please retry.',
                       409 if isinstance(exc, TransitionConflict) else 503)
-    return _success({'request': req.to_dict()}, 'Status updated')
+    return _success({'request': request_view(req, user)}, 'Status updated')

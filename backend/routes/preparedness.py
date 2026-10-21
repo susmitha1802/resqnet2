@@ -6,6 +6,7 @@ from models import User, PreparednessPing, Volunteer, WeatherAlert
 from routes.middleware import require_any_role
 from map_provenance import demo_alert, demo_alert_filter
 from sqlalchemy import or_, update
+from sqlalchemy.exc import SQLAlchemyError
 
 preparedness_bp = Blueprint('preparedness', __name__)
 
@@ -64,21 +65,28 @@ def respond_to_ping(ping_id):
     if ping.status != 'Sent':
         return jsonify({'success': False, 'message': 'Ping already responded to'}), 409
         
-    data = request.get_json() or {}
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return jsonify(success=False, message='A JSON object with status is required.'), 400
     new_status = data.get('status')
     
     if new_status not in ('Acknowledged', 'Unavailable'):
         return jsonify({'success': False, 'message': 'Invalid status'}), 400
         
-    changed = db.session.execute(update(PreparednessPing).where(
-        PreparednessPing.ping_id == ping_id, PreparednessPing.user_id == int(uid), PreparednessPing.status == 'Sent'
-    ).values(status=new_status, acknowledged_at=datetime.now(timezone.utc))).rowcount
-    if changed != 1:
+    try:
+        changed = db.session.execute(update(PreparednessPing).where(
+            PreparednessPing.ping_id == ping_id, PreparednessPing.user_id == int(uid), PreparednessPing.status == 'Sent'
+        ).values(status=new_status, acknowledged_at=datetime.now(timezone.utc))).rowcount
+        if changed != 1:
+            db.session.rollback()
+            return jsonify(success=False, message='Ping already responded to'), 409
+        db.session.commit()
+    except SQLAlchemyError:
         db.session.rollback()
-        return jsonify(success=False, message='Ping already responded to'), 409
-    db.session.commit()
+        return jsonify(success=False, message='Response could not be saved. Reload before retrying.'), 503
     
-    return jsonify({'success': True, 'message': 'Ping responded successfully'}), 200
+    return jsonify(success=True, message='Response saved.',
+                   ping={'ping_id': ping_id, 'status': new_status}), 200
 
 @preparedness_bp.route('/preparedness/summary', methods=['GET'])
 @jwt_required()

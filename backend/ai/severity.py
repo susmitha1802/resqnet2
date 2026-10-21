@@ -5,15 +5,13 @@ ResQNet — Damage Severity Classification
 
 def classify_severity(image_path: str | None = None, disaster_type: str | None = None) -> str:
     """
-    Classifies structural damage severity from an uploaded image.
-
-    If an image_path is provided it uses PIL pixel-heuristics (placeholder
-    for a real CV / scikit-learn model).  Falls back to disaster-type rules.
+    Unvalidated estimate using image-color thresholds or disaster-type rules.
+    This does not independently identify disaster type, confirm structural damage,
+    predict future conditions, or provide a calibrated confidence measurement.
 
     Returns one of:
-        'Severe Damage'   — Immediate response required
-        'Moderate Damage' — Urgent but not life-threatening
-        'Low Damage'      — Minor structural impact
+        'Severe Damage', 'Moderate Damage', 'Low Damage'
+    These are legacy estimate labels, not verified conditions or response advice.
     """
     if image_path:
         try:
@@ -27,10 +25,10 @@ def classify_severity(image_path: str | None = None, disaster_type: str | None =
             red_ratio   = arr[:, :, 0].mean() / 255.0
             green_ratio = arr[:, :, 1].mean() / 255.0
 
-            # Very dark → heavy smoke/night → severe
+            # Legacy brightness threshold; not evidence of smoke or damage.
             if brightness < 0.30:
                 return 'Severe Damage'
-            # Dominant red → fire / structural damage
+            # Legacy red-channel threshold; not evidence of fire or damage.
             if red_ratio > 0.55:
                 return 'Severe Damage'
             # Moderate indicators

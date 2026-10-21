@@ -14,8 +14,9 @@ function setup(form) {
     document: { getElementById: id => elements.get(id), addEventListener() {}, createElement: () => ({}), head: { appendChild() {} } },
     navigator: { geolocation: { getCurrentPosition(ok, bad, settings) { success = ok; failure = bad; options = settings; } } },
     AbortController, console, Toast: { show: (message, kind) => messages.push({ message, kind }) },
+    Api: { BASE: 'http://local-api' },
     setTimeout: callback => { timers.set(++timerId, callback); return timerId; }, clearTimeout: id => timers.delete(id),
-    fetch: async (url, settings) => { calls.push({ url, settings }); return { ok: true, json: async () => ({ display_name: 'Local Road, Test Town, Test State' }) }; },
+    fetch: async (url, settings) => { calls.push({ url, settings }); return { ok: true, json: async () => ({ result: { display_name: 'Local Road, Test Town, Test State' } }) }; },
   };
   context.window = context;
   vm.createContext(context);
@@ -45,8 +46,8 @@ for (const form of ['help-request', 'report']) {
     assert.match(form === 'report' ? s.elements.get('location-input').value : s.elements.get('location-display').textContent, /Local Road/);
     assert.equal(s.calls.length, 1);
     const url = new URL(s.calls[0].url);
-    assert.equal(url.origin + url.pathname, 'https://nominatim.openstreetmap.org/reverse');
-    assert.equal(url.searchParams.get('format'), 'jsonv2');
+    assert.equal(url.origin + url.pathname, 'http://local-api/geocode');
+    assert.equal(url.searchParams.get('kind'), 'reverse');
     assert.equal(url.searchParams.get('lon'), '78.4487');
     assert.equal(s.calls[0].settings.redirect, 'error');
     assert.equal(s.elements.get('get-location-btn').disabled, false);
@@ -107,7 +108,7 @@ for (const form of ['help-request', 'report']) {
     s.success();
     await Promise.resolve();
     await s.manualPick(12, 77, 'Manual address');
-    resolve({ ok: true, json: async () => ({ display_name: 'GPS address' }) });
+    resolve({ ok: true, json: async () => ({ result: { display_name: 'GPS address' } }) });
     await pending;
     assert.equal(s.elements.get('lat-input').value, '12.000000');
     assert.match(s.messages.at(-1).message, /manually selected location was kept/);

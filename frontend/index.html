@@ -4,9 +4,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ResQNet — AI-Powered Disaster Relief Coordination</title>
+  <title>ResQNet — Community Disaster Relief Coordination</title>
   <meta name="description"
-    content="ResQNet connects disaster reporters with volunteers and NGOs in real time using AI-driven prioritization, live maps, and resource management.">
+    content="ResQNet connects community reporters with volunteers and NGOs using rule-based SOS priority, incident maps, and resource coordination.">
   <link rel="stylesheet" href="css/styles.css">
   <style>
     /* HERO */
@@ -296,7 +296,7 @@
     <ul class="nav-links" id="nav-links">
       <li><a href="#preparedness">Preparedness</a></li>
       <li><a href="#workflow">Workflow</a></li>
-      <li><a href="#ai">AI Engine</a></li>
+      <li><a href="#ai">How Priority Works</a></li>
       <li><a href="map.html">Live Map</a></li>
       <li><a href="#contact">Contact</a></li>
     </ul>
@@ -309,7 +309,7 @@
   <div class="nav-mobile-menu" id="nav-mobile-menu">
     <a href="#preparedness">Preparedness</a>
     <a href="#workflow">Workflow</a>
-    <a href="#ai">AI Engine</a>
+    <a href="#ai">How Priority Works</a>
     <a href="map.html">Live Map</a>
     <a href="#contact">Contact</a>
     <a href="auth.html" class="btn btn-primary btn-sm" style="margin-top:6px;text-align:center;">🆘 Get Help Now</a>
@@ -330,7 +330,7 @@
             Resilience in the face of crisis
           </div>
           <h1 class="display-1 mb-16">
-            AI-Powered<br>
+            Community<br>
             <span class="gradient-text">Disaster</span><br>
             Coordination.
           </h1>
@@ -344,7 +344,7 @@
           </div>
           <div style="display:flex;gap:24px;margin-top:32px;flex-wrap:wrap;">
             <div style="font-size:0.82rem;color:var(--text-muted);display:flex;align-items:center;gap:6px;"><span
-                style="color:var(--accent-green);">●</span> AI-Powered Prioritization</div>
+                style="color:var(--accent-green);">●</span> Rule-based SOS Priority</div>
             <div style="font-size:0.82rem;color:var(--text-muted);display:flex;align-items:center;gap:6px;"><span
                 style="color:var(--accent-blue);">●</span> Real-Time Map</div>
             <div style="font-size:0.82rem;color:var(--text-muted);display:flex;align-items:center;gap:6px;"><span
@@ -447,15 +447,15 @@
         </div>
         <div class="step-card">
           <div class="step-number" style="border-color:rgba(139,92,246,0.4);color:#8b5cf6;">2</div>
-          <h6>AI Classification</h6>
-          <p style="color:var(--text-secondary);font-size:0.82rem;margin-top:8px;line-height:1.6;">CNN model instantly
-            evaluates the image, determining disaster type and severity priority.</p>
+          <h6>Rule-based Priority</h6>
+          <p style="color:var(--text-secondary);font-size:0.82rem;margin-top:8px;line-height:1.6;">SOS priority uses
+            assistance type and number of people. Community reports are not independently verified.</p>
         </div>
         <div class="step-card">
           <div class="step-number" style="border-color:rgba(0,180,255,0.4);color:var(--accent-blue);">3</div>
-          <h6>Smart Dispatch</h6>
-          <p style="color:var(--text-secondary);font-size:0.82rem;margin-top:8px;line-height:1.6;">Nearby volunteers are
-            alerted while NGOs automatically allocate necessary resources.</p>
+          <h6>Responder Coordination</h6>
+          <p style="color:var(--text-secondary);font-size:0.82rem;margin-top:8px;line-height:1.6;">Volunteers can
+            accept available SOS requests; NGOs allocate their own resources.</p>
         </div>
         <div class="step-card">
           <div class="step-number" style="border-color:rgba(0,230,118,0.4);color:var(--accent-green);">4</div>
@@ -467,39 +467,39 @@
     </div>
   </section>
 
-  <!-- 5. AI CLASSIFICATION -->
+  <!-- 5. RULE-BASED ESTIMATES -->
   <section class="section-sm" id="ai" style="background:var(--bg-secondary);">
     <div class="container">
       <div class="ai-panel">
         <div class="ai-panel-img">
           <div
             style="position:absolute;bottom:20px;left:20px;background:rgba(0,0,0,0.6);padding:8px 12px;border-radius:var(--radius-sm);font-size:0.75rem;border:1px solid rgba(255,255,255,0.2);">
-            📷 Live Upload Stream
+            📷 Community observations
           </div>
         </div>
         <div class="ai-panel-content">
-          <div class="hero-eyebrow mb-12">Intelligent Triage</div>
-          <h2 class="mb-16">Real-Time AI Image Classification</h2>
+          <div class="hero-eyebrow mb-12">Community Reporting</div>
+          <h2 class="mb-16">Rule-based Estimates for Coordination</h2>
           <p style="color:var(--text-secondary);margin-bottom:24px;line-height:1.7;">
-            ResQNet's CNN model analyzes user-submitted images on the fly. It accurately identifies the disaster type —
-            Flood, Fire, Earthquake, Cyclone — and assigns a severity score so critical incidents get immediate
-            attention.
+            The disaster type comes from the reporter. Simple image-color or disaster-type rules provide an
+            unvalidated severity estimate. These estimates can be wrong; they do not confirm damage or predict
+            future disasters. SOS priority uses assistance type and number of people.
           </p>
           <div
             style="background:var(--bg-card);padding:20px;border-radius:var(--radius);border:1px solid var(--border-subtle);display:flex;flex-direction:column;gap:14px;">
             <div style="display:flex;justify-content:space-between;align-items:center;">
-              <span style="font-weight:600;font-size:0.875rem;">Predicted Type:</span>
-              <span style="color:var(--accent-blue);font-weight:700;">🌊 Flood</span>
+              <span style="font-weight:600;font-size:0.875rem;">Disaster Type:</span>
+              <span style="color:var(--accent-blue);font-weight:700;">Community-reported</span>
             </div>
             <div style="display:flex;justify-content:space-between;align-items:center;">
-              <span style="font-weight:600;font-size:0.875rem;">Confidence Score:</span>
-              <span style="color:var(--accent-green);font-weight:700;">98.4%</span>
+              <span style="font-weight:600;font-size:0.875rem;">Severity Method:</span>
+              <span style="color:var(--text-secondary);font-weight:700;">Unvalidated rules</span>
             </div>
             <div style="display:flex;justify-content:space-between;align-items:center;">
-              <span style="font-weight:600;font-size:0.875rem;">Assigned Severity:</span>
+              <span style="font-weight:600;font-size:0.875rem;">Report Status:</span>
               <span
                 style="color:var(--accent-red);font-weight:700;background:rgba(255,45,85,0.1);padding:3px 10px;border-radius:4px;">🔴
-                High Priority</span>
+                Not independently verified</span>
             </div>
           </div>
         </div>
@@ -523,13 +523,13 @@
         </div>
         <div class="resq-card" style="padding:40px;">
           <div class="stat-hl-val gradient-text-blue" id="hero-stat-volunteers">—</div>
-          <div style="color:var(--text-secondary);font-size:0.875rem;margin-top:8px;">Deployed Volunteers</div>
+          <div style="color:var(--text-secondary);font-size:0.875rem;margin-top:8px;">Available Volunteers</div>
         </div>
         <div class="resq-card" style="padding:40px;">
           <div class="stat-hl-val"
             style="background:var(--grad-success);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;"
             id="hero-stat-completed">—</div>
-          <div style="color:var(--text-secondary);font-size:0.875rem;margin-top:8px;">Successfully Resolved</div>
+          <div style="color:var(--text-secondary);font-size:0.875rem;margin-top:8px;">Completed SOS Requests</div>
         </div>
       </div>
     </div>
@@ -639,7 +639,7 @@
         <div>
           <div style="font-weight:800;font-size:1.1rem;margin-bottom:12px;">Res<span
               style="color:var(--accent-red);">Q</span>Net</div>
-          <p style="color:var(--text-secondary);font-size:0.85rem;line-height:1.6;max-width:280px;">AI-powered disaster
+          <p style="color:var(--text-secondary);font-size:0.85rem;line-height:1.6;max-width:280px;">Community disaster
             preparedness and response coordination platform for Visakhapatnam and across India.</p>
           <div style="display:flex;gap:8px;margin-top:16px;">
             <div
@@ -720,11 +720,12 @@
             message: document.getElementById('contact-message').value,
           })
         });
+        const result = await res.json();
+        if (!res.ok || !result?.success) throw new Error(result?.message || 'Message could not be sent');
         Toast.show('Message sent! We will get back to you soon.', 'success');
         e.target.reset();
       } catch (err) {
-        Toast.show('Message sent successfully!', 'success');
-        e.target.reset();
+        Toast.show(err.message || 'Message could not be sent. Please retry.', 'danger');
       }
     }
 
@@ -743,7 +744,7 @@
         const data = await Api.get('/map/data');
         const requests = (data.requests || []).slice(0, 7);
         if (!requests.length) {
-          el.innerHTML = '<div style="text-align:center;padding:30px;color:var(--text-muted);">No active requests at this time.</div>';
+          el.innerHTML = '<div style="text-align:center;padding:30px;color:var(--text-muted);">Incident details are limited in the public view. Sign in for your authorized view.</div>';
           return;
         }
         el.innerHTML = requests.map(r => {
@@ -765,23 +766,25 @@
 
     async function loadStats() {
       try {
-        const data = await Api.get('/map/data');
-        const requests = data.requests || [];
+        const data = await Api.get('/public/stats');
+        if (!data?.success || !data.stats) throw new Error('Statistics unavailable');
+        const stats = data.stats;
         const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
-        set('hero-stat-requests', requests.filter(r => r.status !== 'Completed').length);
-        set('hero-stat-volunteers', data.total_volunteers || (data.volunteers || []).length);
-        set('hero-stat-completed', requests.filter(r => r.status === 'Completed').length);
-        set('status-incidents', requests.filter(r => r.status !== 'Completed').length);
-        set('status-volunteers', data.total_volunteers || (data.volunteers || []).length);
-      } catch (e) { }
+        set('hero-stat-requests', stats.active_requests);
+        set('hero-stat-volunteers', stats.active_volunteers);
+        set('hero-stat-completed', stats.completed);
+        set('status-incidents', stats.active_requests);
+        set('status-volunteers', stats.active_volunteers);
+      } catch (e) { ['hero-stat-requests', 'hero-stat-volunteers', 'hero-stat-completed', 'status-incidents', 'status-volunteers'].forEach(id => { const el = document.getElementById(id); if (el) el.textContent = 'Unavailable'; }); }
 
       try {
         const aData = await Api.get('/alerts');
+        if (!aData?.success || !Array.isArray(aData.alerts)) throw new Error('Alerts unavailable');
         const alerts = aData.alerts || [];
         const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
         set('status-alerts', alerts.length);
         set('status-risk', alerts.filter(a => a.severity === 'Warning' || a.severity === 'Emergency').length);
-      } catch (e) { }
+      } catch (e) { for (const id of ['status-alerts', 'status-risk']) { const el = document.getElementById(id); if (el) el.textContent = 'Unavailable'; } }
 
       try {
         const weather = await Api.get('/weather/live');
@@ -793,7 +796,7 @@
         const w = weather.current;
         const el = document.getElementById('status-weather');
         if (el) el.textContent = `${Math.round(w.main.temp)}°C, ${w.weather[0].main}`;
-      } catch (e) { }
+      } catch (e) { const el = document.getElementById('status-weather'); if (el) el.textContent = 'Unavailable'; }
     }
 
     document.addEventListener('DOMContentLoaded', () => {

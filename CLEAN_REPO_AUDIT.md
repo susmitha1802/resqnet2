@@ -1,5 +1,10 @@
 # Clean ResQNet source preparation
 
+This records the initial source preparation. Subsequent production backend
+repairs and current validation are recorded in DEPLOYMENT_READINESS.md; its file
+list/test counts supersede the initial staged snapshot below. No commit or push
+was made by either task.
+
 Original: `D:\B.Tech\Hackathons\MultiModel-AI-26\resqnet1` (read-only).
 Destination: `D:\B.Tech\Hackathons\MultiModel-AI-26\ResQNet` (absent before copying).
 

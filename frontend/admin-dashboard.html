@@ -30,6 +30,10 @@
       display: flex;
       gap: 8px;
     }
+    @media (max-width: 760px) {
+      .tab-section > div[style*="display:grid"] { grid-template-columns: 1fr !important; }
+      .verify-actions { flex-wrap: wrap; }
+    }
   </style>
 </head>
 
@@ -53,6 +57,10 @@
         onclick="showSection('reports'); return false;"><span class="nav-icon">📢</span> Reports</a>
       <a class="sidebar-nav-item nav-link" href="#" data-section="help-requests"
         onclick="showSection('help-requests'); return false;"><span class="nav-icon">📋</span> Help Requests</a>
+      <a class="sidebar-nav-item nav-link" href="#" data-section="users"
+        onclick="showSection('users'); return false;">Users &amp; Volunteers</a>
+      <a class="sidebar-nav-item nav-link" href="#" data-section="resources"
+        onclick="showSection('resources'); return false;">NGO Resources</a>
       <a class="sidebar-nav-item nav-link" href="#" data-section="preparedness"
         onclick="showSection('preparedness'); return false;"><span class="nav-icon">🛡️</span> Preparedness</a>
       <a class="sidebar-nav-item nav-link" href="#" data-section="verification"
@@ -278,7 +286,7 @@
     <!-- ══════════════════════════════════════════ -->
     <div class="tab-section" id="section-reports">
       <div class="eoc-card">
-        <h3 style="margin-bottom:16px;color:#8b5cf6;">📢 Disaster Reports &amp; AI Analysis</h3>
+        <h3 style="margin-bottom:16px;color:#8b5cf6;">📢 Community Disaster Reports</h3>
         <div class="resq-table-wrapper">
           <table class="resq-table">
             <thead>
@@ -286,9 +294,9 @@
                 <th>ID</th>
                 <th>Reporter</th>
                 <th>Type</th>
-                <th>Severity</th>
+                <th>Rule-based severity estimate</th>
                 <th>Location</th>
-                <th>AI Analysis</th>
+                <th>Report status</th>
                 <th>Time</th>
                 <th>Action</th>
               </tr>
@@ -321,16 +329,31 @@
                 <th>Location</th>
                 <th>Time</th>
                 <th>People</th>
+                <th>Action</th>
               </tr>
             </thead>
             <tbody id="requests-tbody">
               <tr>
-                <td colspan="8" style="text-align:center;padding:30px;color:var(--text-muted)">Loading...</td>
+                <td colspan="9" style="text-align:center;padding:30px;color:var(--text-muted)">Loading...</td>
               </tr>
             </tbody>
           </table>
         </div>
       </div>
+    </div>
+
+    <div class="tab-section" id="section-users">
+      <div class="eoc-card"><h3>Registered users</h3><div class="resq-table-wrapper"><table class="resq-table">
+        <thead><tr><th>ID</th><th>Name</th><th>Role</th><th>Availability</th></tr></thead><tbody id="admin-users-tbody"></tbody>
+      </table></div></div>
+      <div class="eoc-card"><h3>Volunteer activity</h3><div class="resq-table-wrapper"><table class="resq-table">
+        <thead><tr><th>ID</th><th>Name</th><th>Status</th><th>Assigned</th><th>Completed</th></tr></thead><tbody id="admin-volunteers-tbody"></tbody>
+      </table></div></div>
+    </div>
+    <div class="tab-section" id="section-resources">
+      <div class="eoc-card"><h3>NGO inventory and allocations</h3><div class="resq-table-wrapper"><table class="resq-table">
+        <thead><tr><th>ID</th><th>NGO</th><th>Resource</th><th>Quantity</th><th>Location</th><th>Allocated SOS</th></tr></thead><tbody id="admin-resources-tbody"></tbody>
+      </table></div><p id="admin-resources-status" aria-live="polite"></p><button type="button" id="admin-resources-more" class="btn-resq-outline" style="display:none" onclick="loadAdminResources(true)">Load more</button></div>
     </div>
 
     <!-- ══════════════════════════════════════════ -->
@@ -355,10 +378,8 @@
           <div style="display:flex;flex-direction:column;gap:12px;">
             <div id="prep-vol-ready" style="font-size:1.1rem;font-weight:600;">🟢 0 Volunteers Ready</div>
             <div id="prep-ngo-ready" style="font-size:1.1rem;font-weight:600;">🟢 0 NGOs Available</div>
-            <button class="btn-resq" style="padding:10px;" onclick="notifyAllResponders('volunteer')">📣 Notify All
-              Volunteers</button>
-            <button class="btn-resq-outline" style="padding:10px;" onclick="notifyAllResponders('ngo')">📣 Notify All
-              NGOs</button>
+            <button type="button" data-notify class="btn-resq" style="padding:10px;" onclick="notifyAllResponders()">Record in-app alerts for current advisories</button>
+            <p style="color:var(--text-muted);font-size:0.8rem;">For nearby volunteers and NGOs with saved coordinates. Records do not confirm external delivery or acknowledgement.</p>
           </div>
         </div>
       </div>

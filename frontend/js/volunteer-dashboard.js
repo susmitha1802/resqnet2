@@ -10,8 +10,10 @@ function escapeVolunteerText(value) {
 let nearbyRequests = [];
 let myTasks = [];
 let availabilityStatus = true;
-let volunteerLat = null; // Set by syncLocation() or PostgreSQL profile — never hardcoded
+let volunteerLat = null; // Saved private volunteer GPS or current browser position.
 let volunteerLng = null;
+let savedVolunteerStatus = null;
+let volunteerStatusInFlight = false;
 let miniMapInstance = null;
 let volunteerMarker = null;
 let acceptanceInFlight = false;
@@ -137,7 +139,7 @@ function renderRequestCard(r, distKm) {
           : !isAssignableRequest(r) ? '<span>Not available for acceptance</span>'
           : isNearby
           ? `<button class="btn-resq" style="padding:6px 16px;font-size:0.82rem;" onclick="acceptTask(${r.request_id})" ${acceptanceInFlight ? 'disabled' : ''}>${acceptanceInFlight ? 'Please wait…' : '✓ Accept Task'}</button>`
-          : `<button class="btn-resq-outline" style="padding:6px 16px;font-size:0.82rem;" onclick="notifyNearestNGO(${r.request_id})">📢 Notify Nearest NGO</button>`
+          : '<span>Nearest NGO notification unavailable — no delivery mechanism is configured.</span>'
         }
       </div>
     </div>
@@ -190,7 +192,7 @@ async function acceptTask(requestId) {
 }
 
 async function notifyNearestNGO(requestId) {
-  Toast.show('📢 Nearest NGO has been notified about this request.', 'success');
+  Toast.show('Nearest NGO notification is unavailable. No notification was sent or recorded.', 'warning');
 }
 
 /* ── Submit Proof ── */
@@ -414,41 +416,56 @@ function viewOnMap(lat, lng, reqId) {
   window.open(`map.html?lat=${lat}&lng=${lng}${param}`, '_blank');
 }
 
-/* ── Location Sync (browser geolocation → PostgreSQL profile fallback) ── */
+function restoreSavedVolunteerLocation() {
+  const saved = Session.get()?.volunteer;
+  const lat = saved?.last_location_lat;
+  const lng = saved?.last_location_lng;
+  if (typeof lat !== 'number' || typeof lng !== 'number' || !Number.isFinite(lat) || !Number.isFinite(lng)
+    || Math.abs(lat) > 90 || Math.abs(lng) > 180) return false;
+  volunteerLat = lat;
+  volunteerLng = lng;
+  return true;
+}
+
+function applyVolunteerStatus(status) {
+  if (!['available', 'unavailable', 'on_task'].includes(status)) return;
+  savedVolunteerStatus = status;
+  const select = document.getElementById('vol-status-select');
+  if (select) select.value = status;
+}
+
+/* ── Location Sync (browser geolocation, then private saved GPS fallback) ── */
 async function syncLocation() {
+  const hasSaved = restoreSavedVolunteerLocation();
   return new Promise((resolve) => {
     if (!navigator.geolocation) {
-      // No geolocation API — try profile fallback immediately
-      Api.get('/profile').then(data => {
-        const u = data?.user;
-        if (u && u.location_lat != null) {
-          volunteerLat = u.location_lat;
-          volunteerLng = u.location_lng;
-        }
-        resolve();
-      }).catch(() => resolve());
+      resolve(hasSaved ? 'saved' : null);
       return;
     }
     navigator.geolocation.getCurrentPosition(
       async (position) => {
-        volunteerLat = position.coords.latitude;
-        volunteerLng = position.coords.longitude;
-        // Silently persist to backend
-        await Api.put('/volunteer/update-location', { latitude: volunteerLat, longitude: volunteerLng });
-        resolve();
-      },
-      async (error) => {
-        console.warn('Geolocation unavailable, trying saved profile location.', error);
+        const lat = position.coords.latitude;
+        const lng = position.coords.longitude;
+        if (!Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) {
+          resolve(hasSaved ? 'saved' : null);
+          return;
+        }
         try {
-          const data = await Api.get('/profile');
-          const u = data?.user;
-          if (u && u.location_lat != null) {
-            volunteerLat = u.location_lat;
-            volunteerLng = u.location_lng;
+          const data = await Api.put('/volunteer/update-location', { latitude: lat, longitude: lng });
+          if (!data?.success || data.volunteer?.last_location_lat == null || data.volunteer?.last_location_lng == null) {
+            resolve(hasSaved ? 'saved' : null);
+            return;
           }
-        } catch (_) { }
-        resolve();
+          volunteerLat = data.volunteer.last_location_lat;
+          volunteerLng = data.volunteer.last_location_lng;
+          const user = Session.get();
+          if (user) Session.set({ ...user, volunteer: {
+            ...user.volunteer, last_location_lat: volunteerLat, last_location_lng: volunteerLng
+          } }, Session.getToken());
+          resolve('fresh');
+        } catch (_) { resolve(hasSaved ? 'saved' : null); }
       },
+      () => resolve(hasSaved ? 'saved' : null),
       { timeout: 8000, enableHighAccuracy: true }
     );
   });
@@ -458,11 +475,13 @@ async function updateLocationManually() {
   const btn = document.getElementById('update-loc-btn');
   if (btn) btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Updating...';
 
-  await syncLocation();
+  const source = await syncLocation();
   await loadNearbyRequests(); // Recalculate distance
   if (typeof initVolMap === 'function') await initVolMap();
 
-  Toast.show('Location updated successfully', 'success');
+  Toast.show(source === 'fresh' ? 'Location saved successfully' : source === 'saved'
+    ? 'Using your previously saved location' : 'Location unavailable. Allow browser access to update it.',
+    source === 'fresh' ? 'success' : 'warning');
   if (btn) btn.innerHTML = '📍 Update My Location';
 }
 
@@ -484,27 +503,18 @@ function showLocationPrompt() {
 }
 
 async function setMyLocation() {
-  if (!navigator.geolocation) {
-    Toast.show('Geolocation is not supported by your browser', 'warning');
-    return;
-  }
   Toast.show('Detecting your location...', 'info');
-  navigator.geolocation.getCurrentPosition(
-    async (position) => {
-      volunteerLat = position.coords.latitude;
-      volunteerLng = position.coords.longitude;
-      await Api.put('/volunteer/update-location', { latitude: volunteerLat, longitude: volunteerLng });
+  const source = await syncLocation();
+  if (source) {
       const prompt = document.getElementById('location-prompt');
       if (prompt) prompt.style.display = 'none';
       await loadNearbyRequests();
       if (typeof initVolMap === 'function') await initVolMap();
-      Toast.show('Location set! Showing nearby requests. ✅', 'success');
-    },
-    () => {
-      Toast.show('Could not get location. Please enable location access in your browser.', 'danger');
-    },
-    { timeout: 10000, enableHighAccuracy: true }
-  );
+      Toast.show(source === 'fresh' ? 'Location saved. Showing nearby requests.'
+        : 'Using your previously saved location.', source === 'fresh' ? 'success' : 'warning');
+  } else {
+    Toast.show('Location unavailable. Allow browser access or retry later.', 'danger');
+  }
 }
 
 /* ── Mini Map ── */
@@ -561,6 +571,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (!await Session.verifyRole('volunteer')) return;
   populateVolunteerInfo();
   initFilters();
+  applyVolunteerStatus(Session.get()?.volunteer?.availability_status || Session.get()?.availability);
 
   // Assignments do not depend on GPS or map availability.
   const tasks = Promise.all([loadNearbyRequests(), loadMyTasks(), loadPreparednessAlerts(), loadVolunteerAlerts()]);
@@ -571,51 +582,57 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 /* ── Preparedness Alerts ── */
+const respondingPings = new Set();
 async function loadPreparednessAlerts() {
   try {
-    const data = await Api.get('/preparedness/my-pings');
-    if (!data || !data.success) return;
-
-    const pending = data.pings.filter(p => p.status === 'Sent');
-    if (pending.length === 0) return;
-
-    const ping = pending[0];
-    const icons = { Cyclone: '🌀', Flood: '🌊', Storm: '⛈', Heatwave: '🔥', Earthquake: '🌍', Other: '⚠' };
-    const icon = icons[ping.alert_type] || '⚠';
-
-    const bannerHTML = `
-      <div id="preparedness-banner" style="background:var(--bg-card);border:1px solid var(--accent-red);border-radius:var(--radius);padding:20px;margin-bottom:20px;box-shadow:var(--glow-red-sm)">
-        <h3 style="color:var(--accent-red);margin-bottom:8px;font-size:1.1rem">🔔 PREPAREDNESS ALERT — ${icon} ${ping.alert_type} ${ping.severity}</h3>
-        <p style="color:var(--text-secondary);font-size:0.9rem;margin-bottom:16px">${escapeVolunteerText(ping.description)}</p>
-        <div style="font-weight:600;margin-bottom:12px">Please confirm your availability status:</div>
-        <div style="display:flex;gap:12px;flex-wrap:wrap">
-          <button class="btn-resq" style="background:var(--accent-green);border-color:var(--accent-green);color:#fff" onclick="respondToPing(${ping.ping_id}, 'Acknowledged')">✓ I'm Ready & Available</button>
-          <button class="btn-resq-outline" style="border-color:var(--border-subtle)" onclick="respondToPing(${ping.ping_id}, 'Unavailable')">✗ Unavailable Right Now</button>
-        </div>
-        ${pending.length > 1 ? `<div style="font-size:0.8rem;color:var(--text-muted);margin-top:12px">${pending.length - 1} more alert(s) pending</div>` : ''}
-      </div>
-    `;
-
-    const anchor = document.getElementById('availability-banner');
-    if (anchor && !document.getElementById('preparedness-banner')) {
-      anchor.insertAdjacentHTML('beforebegin', bannerHTML);
+    const data = await Api.notificationRequest('/preparedness/my-pings');
+    if (!Array.isArray(data.pings) || data.pings.some(p => !Number.isInteger(p.ping_id) || p.ping_id <= 0
+      || !['Sent', 'Acknowledged', 'Unavailable'].includes(p.status))) {
+      throw new Error('Could not read preparedness responses. Reload before retrying.');
     }
-  } catch (e) { console.error('Failed to load preparedness pings', e); }
+    const banner = document.getElementById('ping-banner');
+    if (!banner) return false;
+    banner.innerHTML = data.pings.map(ping => `
+      <div style="margin-bottom:16px;">
+        <h3 style="color:var(--accent-red);margin-bottom:8px;font-size:1.1rem">Preparedness advisory — ${escapeVolunteerText(ping.alert_type)} ${escapeVolunteerText(ping.severity)}</h3>
+        <p style="color:var(--text-secondary);font-size:0.9rem;margin-bottom:16px">${escapeVolunteerText(ping.description)}</p>
+        ${ping.status === 'Sent' ? `
+        <div style="margin-bottom:12px">Awaiting your response. This does not change task availability.</div>
+        <div style="display:flex;gap:12px;flex-wrap:wrap">
+          <button type="button" data-ping-id="${ping.ping_id}" class="btn-resq" onclick="respondToPing(${ping.ping_id}, 'Acknowledged')" ${respondingPings.has(ping.ping_id) ? 'disabled' : ''}>Acknowledge advisory</button>
+          <button type="button" data-ping-id="${ping.ping_id}" class="btn-resq-outline" onclick="respondToPing(${ping.ping_id}, 'Unavailable')" ${respondingPings.has(ping.ping_id) ? 'disabled' : ''}>Unavailable</button>
+        </div>` : `<p>Response saved: ${escapeVolunteerText(ping.status)}</p>`}
+      </div>
+    `).join('');
+    banner.style.display = data.pings.length ? 'block' : 'none';
+    return true;
+  } catch (error) {
+    Toast.show(error.message || 'Could not load preparedness responses.', 'danger');
+    return false;
+  }
 }
 
 async function respondToPing(pingId, status) {
+  if (!Number.isInteger(pingId) || pingId <= 0 || !['Acknowledged', 'Unavailable'].includes(status)) {
+    Toast.show('Choose a valid advisory response.', 'danger');
+    return;
+  }
+  if (respondingPings.has(pingId)) return;
+  respondingPings.add(pingId);
+  const buttons = () => document.querySelectorAll(`[data-ping-id="${pingId}"]`);
+  buttons().forEach(button => { button.disabled = true; });
   try {
-    const data = await Api.put(`/preparedness/ping/${pingId}`, { status });
-    if (data && data.success) {
-      Toast.show('Status updated successfully!', 'success');
-      const banner = document.getElementById('preparedness-banner');
-      if (banner) banner.remove();
-      loadPreparednessAlerts();
-    } else {
-      Toast.show(data.message || 'Failed to update status', 'danger');
+    const data = await Api.notificationRequest(`/preparedness/ping/${pingId}`, 'PUT', { status });
+    if (data.ping?.ping_id !== pingId || data.ping.status !== status) {
+      throw new Error('Could not confirm the saved response. Reload before retrying.');
     }
-  } catch (e) {
-    Toast.show('Error connecting to server', 'danger');
+    Toast.show(`Response saved: ${status}. Task availability is unchanged.`, 'success');
+    if (!await loadPreparednessAlerts()) Toast.show('Response was saved, but the display could not refresh. Reload to check it.', 'warning');
+  } catch (error) {
+    Toast.show(error.message || 'Could not confirm the response. Reload before retrying.', 'danger');
+  } finally {
+    respondingPings.delete(pingId);
+    buttons().forEach(button => { button.disabled = false; });
   }
 }
 
@@ -637,18 +654,27 @@ async function loadVolunteerAlerts() {
 }
 
 async function updateVolunteerStatusSelect(select) {
-  const statusMap = { 'available': 'ready', 'busy': 'busy', 'unavailable': 'offline' };
-  select.className = `status-select ${statusMap[select.value] || 'offline'}`;
-
+  if (volunteerStatusInFlight) return;
+  const previous = savedVolunteerStatus;
+  const requested = select.value;
+  volunteerStatusInFlight = true;
+  select.disabled = true;
   try {
-    const data = await Api.put('/volunteer/update-status', { status: select.value });
-    if (data && data.success) {
-      Toast.show(`Status updated to ${select.options[select.selectedIndex].text}`, 'success');
-    } else {
-      Toast.show(data.message || 'Failed to update status', 'danger');
+    const data = await Api.put('/volunteer/update-status', { status: requested });
+    if (!data?.success || data.volunteer?.availability_status !== requested) {
+      throw new Error(data?.message || 'Could not save availability');
     }
+    applyVolunteerStatus(requested);
+    const user = Session.get();
+    if (user) Session.set({ ...user, availability: requested,
+      volunteer: { ...user.volunteer, availability_status: requested } }, Session.getToken());
+    Toast.show('Availability saved', 'success');
   } catch (e) {
-    Toast.show('Error updating status', 'danger');
+    applyVolunteerStatus(previous);
+    Toast.show(e.message || 'Could not save availability', 'danger');
+  } finally {
+    select.disabled = false;
+    volunteerStatusInFlight = false;
   }
 }
 

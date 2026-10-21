@@ -334,25 +334,23 @@
         </h1>
 
         <p style="color:var(--text-secondary);font-size:0.925rem;line-height:1.7;max-width:380px;margin-bottom:28px">
-          Join thousands of volunteers, NGOs, and communities using ResQNet to deliver faster, smarter disaster relief
+          Join citizens, volunteers and NGOs using ResQNet to coordinate disaster assistance.
           across India.
         </p>
 
         <div class="auth-bullets">
           <div class="auth-bullet">
             <div class="auth-bullet-icon">🤖</div>
-            <div><strong style="color:var(--text-primary)">AI-Powered Prioritization</strong><br>Requests ranked by
-              severity automatically in milliseconds</div>
+            <div><strong style="color:var(--text-primary)">Rule-based SOS Prioritization</strong><br>Priority uses
+              assistance type and number of people</div>
           </div>
           <div class="auth-bullet">
             <div class="auth-bullet-icon">🗺️</div>
-            <div><strong style="color:var(--text-primary)">Real-Time Map</strong><br>See all active incidents and
-              volunteer positions live</div>
+            <div><strong style="color:var(--text-primary)">Incident Map</strong><br>See incident information permitted for your role</div>
           </div>
           <div class="auth-bullet">
             <div class="auth-bullet-icon">📦</div>
-            <div><strong style="color:var(--text-primary)">Resource Matching</strong><br>NGO inventory automatically
-              matched to active needs</div>
+            <div><strong style="color:var(--text-primary)">Relief Inventory</strong><br>NGOs can allocate their resources to active requests</div>
           </div>
           <div class="auth-bullet">
             <div class="auth-bullet-icon">🔒</div>
@@ -365,7 +363,7 @@
         <div class="auth-stat-ticker">
           <div class="ticker-dot"></div>
           <div class="ticker-text" id="auth-ticker">
-            ResQNet is <strong>actively coordinating</strong> relief operations right now.
+            Citizens can <strong>submit and track SOS requests</strong>.
           </div>
         </div>
       </div>
@@ -610,13 +608,13 @@
       else { input.type = 'password'; icon.textContent = '👁️'; }
     }
 
-    /* ── Live Stat Ticker ── */
+    /* ── Feature ticker (no invented operational counts) ── */
     const TICKERS = [
-      'ResQNet is <strong>actively coordinating</strong> relief operations right now.',
-      '<strong>1,200+</strong> people helped across India this month.',
-      '<strong>300+ volunteers</strong> are registered and ready to deploy.',
-      'Average High-Priority response time: <strong>under 15 minutes</strong>.',
-      'ResQNet covers <strong>5 disaster types</strong> across India.',
+      'Citizens can <strong>submit and track SOS requests</strong>.',
+      'Volunteers can <strong>accept and update assigned requests</strong>.',
+      'NGOs can <strong>manage and allocate relief resources</strong>.',
+      'Admins review private proof before <strong>marking a rescue complete</strong>.',
+      'Community reports and historical flood candidates are <strong>unverified</strong>.',
     ];
     let tickerIdx = 0;
     setInterval(() => {

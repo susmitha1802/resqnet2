@@ -159,7 +159,7 @@ SWAGGER_TEMPLATE = {
                     {"in": "formData", "name": "images",        "required": False, "type": "file"},
                 ],
                 "responses": {
-                    "201": {"description": "Report created + AI severity assessment"},
+                    "201": {"description": "Community report with an unvalidated rule-based severity estimate"},
                     "400": {"description": "Validation error"},
                 },
             }
@@ -209,7 +209,7 @@ SWAGGER_TEMPLATE = {
                     {"in": "formData", "name": "image",            "required": False, "type": "file"},
                 ],
                 "responses": {
-                    "201": {"description": "Request created + AI priority/duplicate/forecast data"},
+                    "201": {"description": "SOS created with rule-based priority and duplicate checks"},
                     "400": {"description": "Validation error"},
                 },
             }
@@ -413,10 +413,16 @@ def create_app(config_class=Config) -> Flask:
     app.register_blueprint(preparedness_bp)
     app.register_blueprint(map_risk_bp)
     app.register_blueprint(flood_bp)
+    from routes.geocode import geocode_bp
+    app.register_blueprint(geocode_bp)
+
+    from rate_limits import init_rate_limiting
+    init_rate_limiting(app)
 
     # ── Create Tables ─────────────────────────────────────────────────────────
     with app.app_context():
-        db.create_all()
+        from database import initialize_database
+        initialize_database()
         from models import User
         if app.config.get('SEED_DEMO_DATA', False) and User.query.count() == 0:
             try:
@@ -512,11 +518,14 @@ def create_app(config_class=Config) -> Flask:
         
         # Completed = total resolved requests
         completed_reqs = HelpRequest.query.filter_by(status='Completed').count()
+        active_reqs = HelpRequest.query.filter(HelpRequest.status.in_(
+            ['Pending', 'Accepted', 'En Route', 'On Site'])).count()
         
         return jsonify({
             'success': True,
             'stats': {
                 'total_requests': total_requests,
+                'active_requests': active_reqs,
                 'active_volunteers': active_vols,
                 'completed': completed_reqs
             }

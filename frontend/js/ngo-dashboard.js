@@ -14,6 +14,8 @@ let inventory = [];
 let allocHistory = [];
 let ngoMap = null;
 let mapMarkers = [];
+let savedNGOStatus = null;
+let ngoStatusInFlight = false;
 
 const TYPE_ICONS = { Rescue: '🚁', Food: '🍱', Water: '💧', Medicine: '💊', Shelter: '🏠' };
 const TYPE_COLORS = { Rescue: '#EF4444', Food: '#F59E0B', Water: '#3B82F6', Medicine: '#10B981', Shelter: '#8B5CF6' };
@@ -36,6 +38,17 @@ function populateNgoInfo() {
   if (orgEl1) orgEl1.textContent = orgName;
   const orgEl2 = document.getElementById('header-org-name');
   if (orgEl2) orgEl2.textContent = orgName;
+  applyNGOStatus(user.availability);
+}
+
+function applyNGOStatus(status) {
+  if (!['available', 'unavailable'].includes(status)) return;
+  savedNGOStatus = status;
+  const select = document.getElementById('ngo-status-select');
+  if (select) {
+    select.value = status;
+    select.className = `readiness-select ${status === 'available' ? 'ready' : 'offline'}`;
+  }
 }
 
 /* ── Tab Navigation ────────────────────────────────────────────────────────── */
@@ -288,7 +301,8 @@ function renderInventory() {
       <td>${status}</td>
       <td>
         ${!isAllocated ? `<button class="btn-resq-outline" style="padding:4px 12px;font-size:0.75rem"
-          onclick="quickAllocateResource(${r.resource_id})">🔗 Assign</button>` : `<span style="color:var(--text-muted);font-size:0.78rem">Deployed</span>`}
+          onclick="quickAllocateResource(${r.resource_id})">🔗 Assign</button>
+          <button class="btn-resq-outline" onclick="editResource(${r.resource_id})">Edit</button>` : `<span style="color:var(--text-muted);font-size:0.78rem">Deployed</span>`}
       </td>
     </tr>`;
   }).join('');
@@ -298,6 +312,30 @@ function quickAllocateResource(resourceId) {
   const resSelect = document.getElementById('alloc-resource');
   if (resSelect) resSelect.value = resourceId;
   document.getElementById('allocation-section')?.scrollIntoView({ behavior: 'smooth' });
+}
+
+function editResource(resourceId) {
+  const resource = inventory.find(r => r.resource_id === resourceId && !r.allocated_to);
+  if (!resource) { Toast.show('Only unallocated resources can be edited', 'warning'); return; }
+  document.getElementById('edit-resource-id').value = resourceId;
+  document.getElementById('edit-resource-label').textContent = `#${resourceId}`;
+  document.getElementById('edit-resource-quantity').value = resource.quantity;
+  document.getElementById('edit-resource-location').value = resource.location || '';
+  document.getElementById('edit-resource-form').classList.add('open');
+  document.getElementById('edit-resource-form').scrollIntoView({ behavior: 'smooth' });
+}
+
+async function saveResourceEdit() {
+  const id = Number(document.getElementById('edit-resource-id').value);
+  const quantity = Number(document.getElementById('edit-resource-quantity').value);
+  const location = document.getElementById('edit-resource-location').value.trim();
+  if (!Number.isSafeInteger(quantity) || quantity <= 0) { Toast.show('Enter a positive whole quantity', 'warning'); return; }
+  const result = await Api.put(`/ngo/resources/${id}`, { quantity, location });
+  Toast.show(result?.success ? 'Resource updated' : (result?.message || 'Resource update failed'), result?.success ? 'success' : 'danger');
+  if (result?.success) {
+    document.getElementById('edit-resource-form').classList.remove('open');
+    await loadInventory();
+  }
 }
 
 function toggleAddResourceForm() {
@@ -346,9 +384,9 @@ function updateAllocationResourceDropdown() {
 function updateAllocationRequestDropdown() {
   const sel = document.getElementById('alloc-request');
   if (!sel) return;
-  const pending = allRequests.filter(r => r.status === 'Pending');
+  const active = allRequests.filter(r => ['Pending', 'Accepted', 'En Route', 'On Site'].includes(r.status));
   sel.innerHTML = `<option value="">— Choose request —</option>` +
-    pending.map(r => `<option value="${r.request_id}">#${r.request_id} — ${TYPE_ICONS[r.request_type] || ''} ${r.request_type} (${escapeResourceText(r.name || 'Assistance request')})</option>`).join('');
+    active.map(r => `<option value="${r.request_id}">#${r.request_id} — ${TYPE_ICONS[r.request_type] || ''} ${r.request_type} (${escapeResourceText(r.name || 'Assistance request')})</option>`).join('');
 }
 
 async function allocateResource() {
@@ -453,51 +491,61 @@ async function loadWeather() {
 }
 
 /* ── Preparedness Alerts ── */
+const respondingPings = new Set();
 async function loadPreparednessAlerts() {
   try {
-    const data = await Api.get('/preparedness/my-pings');
-    if (!data || !data.success) return;
-
-    const pending = data.pings.filter(p => p.status === 'Sent');
-    if (pending.length === 0) return;
-
-    const ping = pending[0];
-    const icons = { Cyclone: '🌀', Flood: '🌊', Storm: '⛈', Heatwave: '🔥', Earthquake: '🌍', Other: '⚠' };
-    const icon = icons[ping.alert_type] || '⚠';
+    const data = await Api.notificationRequest('/preparedness/my-pings');
+    if (!Array.isArray(data.pings) || data.pings.some(p => !Number.isInteger(p.ping_id) || p.ping_id <= 0
+      || !['Sent', 'Acknowledged', 'Unavailable'].includes(p.status))) {
+      throw new Error('Could not read preparedness responses. Reload before retrying.');
+    }
 
     const bannerHTML = `
       <div id="preparedness-banner" style="background:var(--bg-card);border:1px solid var(--accent-red);border-radius:var(--radius);padding:20px;margin-bottom:20px;box-shadow:var(--glow-red-sm)">
-        <h3 style="color:var(--accent-red);margin-bottom:8px;font-size:1.1rem">🔔 PREPAREDNESS ALERT — ${icon} ${ping.alert_type} ${ping.severity}</h3>
+      ${data.pings.map(ping => `<div style="margin-bottom:16px;">
+        <h3 style="color:var(--accent-red);margin-bottom:8px;font-size:1.1rem">Preparedness advisory — ${escapeResourceText(ping.alert_type)} ${escapeResourceText(ping.severity)}</h3>
         <p style="color:var(--text-secondary);font-size:0.9rem;margin-bottom:16px">${escapeResourceText(ping.description)}</p>
-        <div style="font-weight:600;margin-bottom:12px">Please confirm your organisation's resource readiness:</div>
+        ${ping.status === 'Sent' ? `
+        <div style="margin-bottom:12px">Awaiting your response. This does not update inventory or readiness.</div>
         <div style="display:flex;gap:12px;flex-wrap:wrap">
-          <button class="btn-resq" style="background:var(--accent-green);border-color:var(--accent-green);color:#fff" onclick="respondToPing(${ping.ping_id}, 'Acknowledged')">✓ Resources Ready — We Can Deploy</button>
-          <button class="btn-resq-outline" style="border-color:var(--border-subtle)" onclick="respondToPing(${ping.ping_id}, 'Unavailable')">✗ Resources Unavailable Right Now</button>
-        </div>
-        ${pending.length > 1 ? `<div style="font-size:0.8rem;color:var(--text-muted);margin-top:12px">${pending.length - 1} more alert(s) pending</div>` : ''}
+          <button type="button" data-ping-id="${ping.ping_id}" class="btn-resq" onclick="respondToPing(${ping.ping_id}, 'Acknowledged')" ${respondingPings.has(ping.ping_id) ? 'disabled' : ''}>Acknowledge advisory</button>
+          <button type="button" data-ping-id="${ping.ping_id}" class="btn-resq-outline" onclick="respondToPing(${ping.ping_id}, 'Unavailable')" ${respondingPings.has(ping.ping_id) ? 'disabled' : ''}>Unavailable</button>
+        </div>` : `<p>Response saved: ${escapeResourceText(ping.status)}</p>`}
+      </div>`).join('')}
       </div>
     `;
 
+    document.getElementById('preparedness-banner')?.remove();
     const anchor = document.querySelector('.stats-grid-4');
-    if (anchor && !document.getElementById('preparedness-banner')) {
-      anchor.insertAdjacentHTML('beforebegin', bannerHTML);
-    }
-  } catch (e) { console.error('Failed to load preparedness pings', e); }
+    if (anchor && data.pings.length) anchor.insertAdjacentHTML('beforebegin', bannerHTML);
+    return true;
+  } catch (error) {
+    Toast.show(error.message || 'Could not load preparedness responses.', 'danger');
+    return false;
+  }
 }
 
 async function respondToPing(pingId, status) {
+  if (!Number.isInteger(pingId) || pingId <= 0 || !['Acknowledged', 'Unavailable'].includes(status)) {
+    Toast.show('Choose a valid advisory response.', 'danger');
+    return;
+  }
+  if (respondingPings.has(pingId)) return;
+  respondingPings.add(pingId);
+  const buttons = () => document.querySelectorAll(`[data-ping-id="${pingId}"]`);
+  buttons().forEach(button => { button.disabled = true; });
   try {
-    const data = await Api.put(`/preparedness/ping/${pingId}`, { status });
-    if (data && data.success) {
-      Toast.show('Status updated successfully!', 'success');
-      const banner = document.getElementById('preparedness-banner');
-      if (banner) banner.remove();
-      loadPreparednessAlerts();
-    } else {
-      Toast.show(data.message || 'Failed to update status', 'danger');
+    const data = await Api.notificationRequest(`/preparedness/ping/${pingId}`, 'PUT', { status });
+    if (data.ping?.ping_id !== pingId || data.ping.status !== status) {
+      throw new Error('Could not confirm the saved response. Reload before retrying.');
     }
-  } catch (e) {
-    Toast.show('Error connecting to server', 'danger');
+    Toast.show(`Response saved: ${status}. Inventory and readiness are unchanged.`, 'success');
+    if (!await loadPreparednessAlerts()) Toast.show('Response was saved, but the display could not refresh. Reload to check it.', 'warning');
+  } catch (error) {
+    Toast.show(error.message || 'Could not confirm the response. Reload before retrying.', 'danger');
+  } finally {
+    respondingPings.delete(pingId);
+    buttons().forEach(button => { button.disabled = false; });
   }
 }
 
@@ -519,18 +567,26 @@ async function loadNGOAlerts() {
 }
 
 async function updateNGOStatusSelect(select) {
-  const statusMap = { 'available': 'ready', 'unavailable': 'offline' };
-  select.className = `status-select ${statusMap[select.value] || 'offline'}`;
-
+  if (ngoStatusInFlight) return;
+  const previous = savedNGOStatus;
+  const requested = select.value;
+  ngoStatusInFlight = true;
+  select.disabled = true;
   try {
-    const data = await Api.put('/volunteer/update-status', { status: select.value });
-    if (data && data.success) {
-      Toast.show(`NGO Readiness set to ${select.options[select.selectedIndex].text}`, 'success');
-    } else {
-      Toast.show(data.message || 'Failed to update readiness', 'danger');
+    const data = await Api.put('/ngo/readiness', { status: requested });
+    if (!data?.success || data.availability !== requested) {
+      throw new Error(data?.message || 'Could not save readiness');
     }
+    applyNGOStatus(requested);
+    const user = Session.get();
+    if (user) Session.set({ ...user, availability: requested }, Session.getToken());
+    Toast.show('NGO readiness saved', 'success');
   } catch (e) {
-    Toast.show('Error updating readiness', 'danger');
+    applyNGOStatus(previous);
+    Toast.show(e.message || 'Could not save readiness', 'danger');
+  } finally {
+    select.disabled = false;
+    ngoStatusInFlight = false;
   }
 }
 

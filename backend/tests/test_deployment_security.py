@@ -56,6 +56,7 @@ class DeploymentSecurityTests(unittest.TestCase):
         allowed = self.client.options('/profile', headers={'Origin':origin,'Access-Control-Request-Method':'GET','Access-Control-Request-Headers':'Authorization'})
         self.assertEqual(allowed.headers.get('Access-Control-Allow-Origin'), origin)
         self.assertIsNone(self.client.get('/health',headers={'Origin':'https://untrusted.invalid'}).headers.get('Access-Control-Allow-Origin'))
+        self.assertIsNone(self.client.get('/health',headers={'Origin':origin+'.untrusted.invalid'}).headers.get('Access-Control-Allow-Origin'))
 
     def test_private_responses_are_not_cacheable_and_upload_paths_are_not_public(self):
         result = self.client.get('/profile',headers=self.headers())
@@ -127,8 +128,10 @@ class DeploymentSecurityTests(unittest.TestCase):
             with self.assertRaises(RuntimeError):
                 self.make_app(TESTING=False,**overrides)
         # Successful production startup uses only a brand-new database in this temporary root.
-        app=self.make_app(TESTING=False,PERSISTENT_STORAGE_PATH=self.storage.name,
-                          SQLALCHEMY_DATABASE_URI='sqlite:///'+(Path(self.storage.name)/'isolated.db').as_posix())
+        with patch('limits.storage.RedisStorage.check',return_value=True):
+            app=self.make_app(TESTING=False,PERSISTENT_STORAGE_PATH=self.storage.name,
+                              RATELIMIT_STORAGE_URI='redis://127.0.0.1:6379/15',
+                              SQLALCHEMY_DATABASE_URI='sqlite:///'+(Path(self.storage.name)/'isolated.db').as_posix())
         self.assertEqual(app.test_client().get('/health').status_code,200)
         with app.app_context():
             self.assertEqual(User.query.count(),0)

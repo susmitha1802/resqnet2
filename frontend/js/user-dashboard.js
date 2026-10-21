@@ -10,6 +10,11 @@ function escapeCitizenText(value) {
 let currentRequests = [];
 let selectedRequest = null;
 
+async function viewCitizenImage(path) {
+  try { await Api.viewPrivateImage(path); }
+  catch (error) { Toast.show(error.message || 'Image unavailable', 'danger'); }
+}
+
 /* ── Populate User Info ── */
 function populateUserInfo() {
   const user = Session.get();
@@ -25,6 +30,8 @@ function populateUserInfo() {
     if (su) su.textContent = user.name;
     document.querySelectorAll('.profile-email').forEach(el => el.textContent = user.email || '—');
     document.querySelectorAll('.profile-phone').forEach(el => el.textContent = user.phone || '—');
+    const memberSince = document.getElementById('profile-member-since');
+    if (memberSince) memberSince.textContent = user.created_at ? new Date(user.created_at).toLocaleDateString() : 'Unavailable';
   }
 }
 
@@ -70,7 +77,7 @@ function renderRequestTable(requests) {
       <td>${priorityBadge(r.priority_level)}</td>
       <td>${statusBadge(r.status)}${r.progress_status && r.progress_status !== r.status ? `<div style="font-size:0.75rem">${r.progress_status}</div>` : ''}</td>
       <td style="color:var(--text-muted);font-size:0.78rem">${timeAgo(r.created_at)}</td>
-      <td><button class="btn-resq-outline" style="padding:3px 10px;font-size:0.72rem;" onclick="showAIResult(${r.request_id})">AI Result</button></td>
+      <td><a class="btn-resq-outline" style="padding:3px 10px;font-size:0.72rem;" href="map.html?request_id=${r.request_id}">Map</a>${r.image_url ? `<button class="btn-resq-outline" onclick="viewCitizenImage('${r.image_url}')">Image</button>` : ''}</td>
     </tr>
   `).join('');
 }
@@ -140,24 +147,22 @@ function loadNotifications() {
   if (!notifList) return;
 
   if (currentRequests.length === 0) {
-    notifList.innerHTML = '<div class="notif-empty" style="padding:20px;text-align:center;color:var(--text-muted)">No notifications yet.</div>';
+    notifList.innerHTML = '<div class="notif-empty" style="padding:20px;text-align:center;color:var(--text-muted)">No requests to track yet.</div>';
     if (notifBadge) notifBadge.style.display = 'none';
     return;
   }
 
-  const recent = [...currentRequests].sort((a,b) => new Date(b.created_at) - new Date(a.created_at)).slice(0, 5);
+  const recent = [...currentRequests].sort((a,b) => new Date(b.updated_at || b.created_at) - new Date(a.updated_at || a.created_at)).slice(0, 5);
   notifList.innerHTML = recent.map(r => `
     <div style="padding:12px;border-bottom:1px solid var(--border-subtle)">
-      <div style="font-weight:600;font-size:0.85rem">Status Update</div>
-      <div style="font-size:0.8rem;color:var(--text-secondary)">Your ${r.request_type} request is now <strong>${r.status}</strong></div>
-      <div style="font-size:0.7rem;color:var(--text-muted);margin-top:4px">${timeAgo(r.created_at)}</div>
+      <div style="font-weight:600;font-size:0.85rem">Current request progress</div>
+      <div style="font-size:0.8rem;color:var(--text-secondary)">Your ${r.request_type} request is now <strong>${escapeCitizenText(r.progress_status || r.status)}</strong></div>
+      <div style="font-size:0.7rem;color:var(--text-muted);margin-top:4px">${timeAgo(r.updated_at || r.created_at)}</div>
     </div>
   `).join('');
 
-  if (notifBadge) {
-    notifBadge.textContent = recent.length;
-    notifBadge.style.display = 'flex';
-  }
+  // There is no persisted unread/delivery state for these request snapshots.
+  if (notifBadge) notifBadge.style.display = 'none';
 }
 
 /* ── Fetch Disaster Reports ── */
@@ -182,26 +187,23 @@ async function loadDisasters() {
   tbody.innerHTML = myReports.map(r => `
     <tr>
       <td style="font-weight:600">
-        🔥 ${r.disaster_type}
+        🔥 ${escapeCitizenText(r.disaster_type)}
       </td>
       <td>
         <span class="priority-badge" style="
-          background:${r.severity.includes('Severe') ? 'rgba(239,68,68,0.2)' : (r.severity.includes('Moderate') ? 'rgba(245,158,11,0.2)' : 'rgba(16,185,129,0.2)')};
-          color:${r.severity.includes('Severe') ? '#EF4444' : (r.severity.includes('Moderate') ? '#F59E0B' : '#10B981')}
-        ">${r.severity}</span>
+          background:${r.severity?.includes('Severe') ? 'rgba(239,68,68,0.2)' : (r.severity?.includes('Moderate') ? 'rgba(245,158,11,0.2)' : 'rgba(16,185,129,0.2)')};
+          color:${r.severity?.includes('Severe') ? '#EF4444' : (r.severity?.includes('Moderate') ? '#F59E0B' : '#10B981')}
+        ">${escapeCitizenText(r.severity || 'Unavailable')}</span>
       </td>
       <td style="color:var(--text-secondary)">📍 ${r.latitude.toFixed(4)}, ${r.longitude.toFixed(4)}</td>
       <td>
-        ${
-          !r.predicted_disaster_type ? '<span class="ai-badge medium">Pending</span>' :
-          r.ai_mismatch ? '<span class="ai-badge mismatch">Mismatch</span>' :
-          '<span class="ai-badge verified">Verified</span>'
-        }
+        <span class="ai-badge medium">Not independently verified</span>
       </td>
       <td style="color:var(--text-secondary)">${timeAgo(r.created_at)}</td>
       <td>
         <div style="display:flex;gap:6px">
-          <button onclick="showAIResult(${r.report_id})" class="btn-resq-outline" style="padding:4px 8px;font-size:0.75rem">🤖 AI Result</button>
+          <button type="button" onclick="showReportDetails(${r.report_id})" class="btn-resq-outline" style="padding:4px 8px;font-size:0.75rem">Report details</button>
+          ${r.image_url ? `<button type="button" onclick="viewCitizenImage('${r.image_url}')" class="btn-resq-outline">Image</button>` : ''}
           <a href="map.html?report_id=${r.report_id}" class="btn-resq-outline" style="padding:4px 8px;font-size:0.75rem">🗺️ Map</a>
         </div>
       </td>
@@ -209,55 +211,26 @@ async function loadDisasters() {
   `).join('');
 }
 
-window.showAIResult = function(reportId) {
+window.showReportDetails = function(reportId) {
   const r = window._myReports?.find(x => x.report_id === reportId);
   const panel = document.getElementById('ai-result-panel');
   if (!panel || !r) return;
 
-  if (!r.predicted_disaster_type) {
-    panel.innerHTML = `<div style="padding:20px;text-align:center;color:var(--text-muted)">AI is currently analyzing this report...</div>`;
-    return;
-  }
-
-  const aiConf = r.prediction_confidence || 0;
-  let barColorClass = aiConf >= 80 ? 'high' : (aiConf >= 50 ? 'medium' : 'low');
-  let label = aiConf >= 80 ? 'High' : (aiConf >= 50 ? 'Medium' : 'Low');
-
   panel.innerHTML = `
     <div class="ai-card" style="margin-top:0; border:none; box-shadow:none;">
-      <div class="ai-card-title">🤖 AI Analysis Report</div>
-      
-
-
+      <div class="ai-card-title">Report details</div>
       <div class="ai-comparison-grid">
         <div class="ai-comp-col">
-          <div class="ai-comp-label">Reporter Selected</div>
-          <div class="ai-comp-value">${r.disaster_type}</div>
+          <div class="ai-comp-label">Community-reported type</div>
+          <div class="ai-comp-value">${escapeCitizenText(r.disaster_type)}</div>
         </div>
         <div class="ai-comp-col" style="border-color: var(--accent-blue);">
-          <div class="ai-comp-label">CNN Prediction</div>
-          <div class="ai-comp-value" style="color: var(--accent-blue);">${escapeCitizenText(r.predicted_disaster_type)}</div>
+          <div class="ai-comp-label">Rule-based severity estimate</div>
+          <div class="ai-comp-value" style="color: var(--accent-blue);">${escapeCitizenText(r.severity || 'Unavailable')}</div>
         </div>
       </div>
-
-      <div style="margin-bottom:16px;">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-          <span style="font-size:0.8rem; color:var(--text-secondary);">AI Confidence</span>
-          <span style="font-size:0.8rem; font-weight:700;">${aiConf}%</span>
-        </div>
-        <div class="ai-conf-track">
-          <div class="ai-conf-fill ${barColorClass}" style="width: ${aiConf}%;"></div>
-        </div>
-        <div style="font-size:0.75rem; color:var(--text-muted); margin-top:4px; text-align:right;">${label}</div>
-      </div>
-
-      <div style="padding-top:12px; border-top:1px solid var(--border-subtle); display:flex; justify-content:space-between; align-items:center;">
-        <span style="font-size:0.85rem; color:var(--text-secondary);">Status:</span>
-        ${r.ai_mismatch 
-          ? '<span class="ai-badge mismatch">⚠ Prediction differs</span>' 
-          : '<span class="ai-badge verified">✅ AI agrees</span>'
-        }
-      </div>
+      <p>Source: ${escapeCitizenText(r.source || 'Community incident report (unverified)')}</p>
+      <p>Not independently verified. Severity uses unvalidated image-color/type rules and does not confirm damage.</p>
     </div>
   `;
 }

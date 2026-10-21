@@ -5,7 +5,7 @@ services:
     runtime: python
     rootDir: backend
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn --bind 0.0.0.0:$PORT --workers 1 --threads 4 wsgi:application
+    startCommand: gunicorn --bind 0.0.0.0:$PORT --workers 1 --threads 4 --worker-class gthread --timeout 90 wsgi:application
     healthCheckPath: /health
     plan: starter
     disk:
@@ -33,3 +33,7 @@ services:
         value: /var/data/resqnet/uploads
       - key: CORS_ORIGINS
         value: https://resqnet1-2026.netlify.app
+      - key: RATELIMIT_STORAGE_URI
+        sync: false
+      - key: TRUSTED_PROXY_HOPS
+        sync: false

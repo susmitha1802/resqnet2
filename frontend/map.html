@@ -159,6 +159,7 @@
       <span class="map-search-icon">🔍</span>
       <input type="text" id="map-search-input" class="map-search-input" placeholder="Search places, addresses..."
         autocomplete="off">
+      <button type="button" id="map-search-input-button" aria-label="Search map address">Search</button>
       <div id="map-search-results" class="map-search-results"></div>
     </div>
 
@@ -362,7 +363,7 @@
         const isAvail = v.availability_status === 'available';
         const color = '#3B82F6';
         const popup = ResQMap.popupHtml(`
-      <div style="font-weight:700;margin-bottom:6px">🤝 ${ResQMap.escapeHTML(v.user_name || 'Volunteer #' + v.volunteer_id)}</div>
+      <div style="font-weight:700;margin-bottom:6px">🤝 ${ResQMap.escapeHtml(v.user_name || 'Volunteer #' + v.volunteer_id)}</div>
       <div style="font-size:0.8rem;margin-bottom:4px">📍 ${lat.toFixed(4)}, ${lng.toFixed(4)}</div>
       <div style="font-weight:600;color:${isAvail ? '#3B82F6' : '#6B7280'};font-size:0.8rem">
         ${isAvail ? '✅' : '⚠️'} ${v.availability_status}

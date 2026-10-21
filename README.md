@@ -6,6 +6,12 @@ proof and admin approval, NGO-owned resources, analytics and Leaflet mapping are
 preserved. Flood Intelligence is optional and experimental; community observations
 and weather thresholds are **not official disaster warnings**.
 
+Architecture: static HTML/CSS/JavaScript + Leaflet in `frontend/`, Flask role-gated
+API and SQLAlchemy records in `backend/`, local SQLite and private uploads under
+ignored runtime directories. [SUBMISSION_DEMO.md](SUBMISSION_DEMO.md) gives a
+role-by-role rehearsal; [SUBMISSION_READINESS_REPORT.md](SUBMISSION_READINESS_REPORT.md)
+separates local demo readiness from public deployment blockers.
+
 This source-only copy contains no accounts, database, uploaded evidence, `.env`,
 virtual environment or previous Git history. See [CLEAN_REPO_AUDIT.md](CLEAN_REPO_AUDIT.md)
 for copy/validation evidence and [DEPLOYMENT_READINESS.md](DEPLOYMENT_READINESS.md)
@@ -78,12 +84,31 @@ The homepage uses the existing backend `/weather/live` proxy. Provide a rotated
 HTML/JavaScript. See [LOCAL_FLOOD.md](LOCAL_FLOOD.md) for opt-in event API setup.
 No satellite data or processing environment is included here.
 
+Map address searches run only after Enter or Search. The backend `/geocode` proxy
+shares a one-request-per-second limit and caches lookups, using the existing Redis
+rate store across production workers. `NOMINATIM_BASE_URL` can switch providers;
+set `NOMINATIM_USER_AGENT` to an app-identifying, contactable value before public
+use. GPS coordinates remain usable if lookup fails. OSM tiles retain visible
+attribution, browser caching and an origin Referer. Do not submit private text to
+the geocoder or use the public service for bulk searches. See the
+[Nominatim policy](https://operations.osmfoundation.org/policies/nominatim/) and
+[tile policy](https://operations.osmfoundation.org/policies/tiles/).
+
+SOS/report evidence accepts one valid JPG or PNG. Owners and admins open stored
+images through authenticated private routes; uploads are never served from the
+static frontend. NGO owners may edit quantity/location only before allocation.
+Admins can review users, volunteer activity and NGO inventory, restore an
+unassigned duplicate to Pending, and correct a report type without marking the
+community observation scientifically verified.
+
 ## Focused verification
 
 ```powershell
 .\.venv\Scripts\python.exe -B -m unittest discover -s backend/tests
 node --test frontend/tests/*.test.cjs
 node frontend/tests/auth-flow.browser.cjs
+node frontend/tests/rbac.browser.cjs
+node frontend/tests/detect-location.browser.cjs
 ```
 
 Browser checks require installed Chrome; `CHROME_BINARY` and `PYTHON_BINARY` may
@@ -94,3 +119,7 @@ Do not run legacy data repair or demo seeding as part of normal setup.
 `netlify.toml` publishes only frontend. `render.yaml` is review-only and proposes
 a paid persistent disk, private uploads, production secret generation and Gunicorn.
 No deployment has been performed or authorized by preparation of this repository.
+Production additionally requires a reachable private Redis-compatible
+`RATELIMIT_STORAGE_URI` and an operator-verified `TRUSTED_PROXY_HOPS` value.
+`memory://` and zero trusted hops are local defaults, not Render production settings.
+See DEPLOYMENT_READINESS.md for the Linux smoke gate and safe Render handoff.

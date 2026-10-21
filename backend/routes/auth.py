@@ -33,10 +33,30 @@ def _error(message='Error', status=400):
     return jsonify({'success': False, 'message': message}), status
 
 
+def _account_view(user):
+    """Expose the authenticated volunteer's operational state and saved GPS."""
+    view = user.to_dict()
+    if user.role == 'volunteer' and user.volunteer:
+        volunteer = user.volunteer
+        view['availability'] = volunteer.availability_status
+        view['volunteer'] = {
+            'availability_status': volunteer.availability_status,
+            'last_location_lat': float(volunteer.last_location_lat) if volunteer.last_location_lat is not None else None,
+            'last_location_lng': float(volunteer.last_location_lng) if volunteer.last_location_lng is not None else None,
+        }
+    return view
+
+
 # ── POST /register ─────────────────────────────────────────────────────────────
 @auth_bp.route('/register', methods=['POST'])
 def register():
-    data = request.get_json(silent=True) or {}
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return _error('A JSON object is required')
+
+    if any(not isinstance(data.get(key, ''), str) for key in
+           ('name', 'email', 'phone', 'password', 'role')):
+        return _error('Registration fields must be strings')
 
     name     = data.get('name', '').strip()
     email    = data.get('email', '').strip().lower()
@@ -49,10 +69,27 @@ def register():
         return _error('All fields are required (name, email, phone, password)')
     if len(name) > 100:
         return _error('Name must be 100 characters or fewer')
+    if len(email) > 150 or len(phone) > 20:
+        return _error('Email or phone is too long')
     if len(password) < 6:
         return _error('Password must be at least 6 characters')
     if role not in VALID_ROLES:
         return _error(f'Invalid role. Must be one of: {", ".join(VALID_ROLES)}')
+    if role == 'volunteer':
+        if data.get('availability', 'available') not in ('available', 'unavailable'):
+            return _error('availability must be available or unavailable')
+        if not isinstance(data.get('location', ''), str):
+            return _error('location must be a string')
+        if len(data.get('location', '')) > 200:
+            return _error('location must be 200 characters or fewer')
+        skills = data.get('skills', [])
+        if not isinstance(skills, list) or any(not isinstance(skill, str) for skill in skills):
+            return _error('skills must be a list of strings')
+    if role == 'ngo' and any(not isinstance(data.get(key, default), str)
+                             for key, default in [('org_name', ''), ('org_type', 'NGO'), ('area', '')]):
+        return _error('Organization fields must be strings')
+    if role == 'ngo' and len(data.get('org_name', '')) > 200:
+        return _error('Organization name must be 200 characters or fewer')
     if is_production(current_app.config) and email in DEMO_ACCOUNT_EMAILS:
         return _error('This address is reserved for local demo data.', 400)
     if User.query.filter_by(email=email).first():
@@ -60,7 +97,10 @@ def register():
 
     # ── Admin secret code check ─────────────────────────────────────────────────
     if role == 'admin':
-        provided_code = data.get('admin_secret_code', '').strip()
+        provided_code = data.get('admin_secret_code', '')
+        if not isinstance(provided_code, str):
+            return _error('Invalid admin secret code. Admin registration is restricted.', 403)
+        provided_code = provided_code.strip()
         configured_code = current_app.config.get('ADMIN_SECRET_CODE', ADMIN_SECRET_CODE)
         if not configured_code or not hmac.compare_digest(provided_code, configured_code):
             return _error('Invalid admin secret code. Admin registration is restricted.', 403)
@@ -86,14 +126,14 @@ def register():
     db.session.flush()   # get user_id before commit
 
     if role == 'volunteer':
-        vol = Volunteer(user_id=user.user_id)
+        vol = Volunteer(user_id=user.user_id, availability_status=user.availability)
         db.session.add(vol)
 
     db.session.commit()
 
     token = create_access_token(identity=str(user.user_id))
     return _success(
-        {'token': token, 'user': user.to_dict()},
+        {'token': token, 'user': _account_view(user)},
         'Account created successfully',
         201
     )
@@ -102,7 +142,11 @@ def register():
 # ── POST /login ────────────────────────────────────────────────────────────────
 @auth_bp.route('/login', methods=['POST'])
 def login():
-    data = request.get_json(silent=True) or {}
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return _error('A JSON object is required')
+    if not isinstance(data.get('email'), str) or not isinstance(data.get('password'), str):
+        return _error('Email and password must be strings')
 
     email    = data.get('email', '').strip().lower()
     password = data.get('password', '')
@@ -120,7 +164,7 @@ def login():
     return _success({
         'token': token,
         'role':  user.role,       # Explicit role field for easy frontend use
-        'user':  user.to_dict()
+        'user':  _account_view(user)
     })
 
 
@@ -130,7 +174,7 @@ def login():
 def get_profile():
     uid  = int(get_jwt_identity())
     user = db.get_or_404(User, uid)
-    return _success({'user': user.to_dict()})
+    return _success({'user': _account_view(user)})
 
 
 # ── POST /seed-demo-users (DEBUG ONLY) ────────────────────────────────────────

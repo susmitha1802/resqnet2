@@ -42,6 +42,11 @@ def validate_runtime_config(app):
         raise RuntimeError('Production ADMIN_SECRET_CODE must be strong or unset to disable admin registration.')
     if config.get('DEBUG') or config.get('SEED_DEMO_DATA'):
         raise RuntimeError('Production requires DEBUG=False and SEED_DEMO_DATA=False.')
+    hops = config.get('TRUSTED_PROXY_HOPS', 0)
+    if type(hops) is not int or not 0 <= hops <= 5:
+        raise RuntimeError('TRUSTED_PROXY_HOPS must be an integer from 0 to 5.')
+    if config.get('RUNNING_ON_RENDER') and hops == 0:
+        raise RuntimeError('Render requires a verified TRUSTED_PROXY_HOPS setting for client rate limits.')
     origins = config.get('CORS_ORIGINS', [])
     if not origins or isinstance(origins, str):
         raise RuntimeError('Production requires an explicit CORS_ORIGINS allowlist.')
@@ -51,14 +56,27 @@ def validate_runtime_config(app):
                 or parsed.path or parsed.query or parsed.fragment or parsed.username):
             raise RuntimeError('Production CORS_ORIGINS must contain exact HTTPS origins.')
     if not config.get('TESTING'):
+        if config.get('RATELIMIT_ENABLED') is False:
+            raise RuntimeError('Production rate limiting cannot be disabled.')
+        rate_uri = config.get('RATELIMIT_STORAGE_URI', '')
+        parsed_rate = urlsplit(rate_uri)
+        if parsed_rate.scheme not in {'redis', 'rediss'} or not parsed_rate.hostname:
+            raise RuntimeError('Production requires Redis-compatible RATELIMIT_STORAGE_URI; memory counters are not allowed.')
         storage = config.get('PERSISTENT_STORAGE_PATH')
         if not storage or not Path(storage).is_absolute():
             raise RuntimeError('Production requires an absolute PERSISTENT_STORAGE_PATH for private uploads.')
         root = Path(storage).resolve()
+        if config.get('RUNNING_ON_RENDER') and not root.is_mount():
+            raise RuntimeError('Render PERSISTENT_STORAGE_PATH must be an attached disk mount, not an ephemeral directory.')
         uploads = Path(config['UPLOAD_FOLDER']).resolve()
         if not uploads.is_relative_to(root):
             raise RuntimeError('Production UPLOAD_FOLDER must be on persistent storage.')
+        if any(not (uploads / folder).resolve().is_relative_to(uploads)
+               for folder in ('requests', 'reports', 'task_proofs')):
+            raise RuntimeError('Private upload subdirectories cannot resolve outside UPLOAD_FOLDER.')
         database = make_url(config['SQLALCHEMY_DATABASE_URI'])
+        if database.drivername != 'sqlite':
+            raise RuntimeError('This deployment supports mounted SQLite only; another database requires a reviewed driver and migration.')
         if database.drivername.startswith('sqlite') and (
             not database.database or not Path(database.database).is_absolute()
             or not Path(database.database).resolve().is_relative_to(root)

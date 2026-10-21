@@ -60,6 +60,7 @@ async function main() {
     '--remote-debugging-port=0', `--user-data-dir=${profile}`, 'about:blank'], { windowsHide: true, stdio: 'ignore' });
   let ws, send, nextId = 0;
   const registrationRoles = [];
+  let demoRequestId, demoTaskId;
   const pending = new Map();
   try {
     const activePort = path.join(profile, 'DevToolsActivePort');
@@ -146,13 +147,23 @@ async function main() {
           'reg-password':'isolated-browser-password','reg-confirm':'isolated-browser-password',
           'reg-org-name':'Fixture organization','admin-secret-code':'isolated-browser-registration-only'};
         for(const [id,value] of Object.entries(values))document.getElementById(id).value=value;
+        if ('${role}' === 'volunteer') document.getElementById('reg-availability').value='unavailable';
         document.getElementById('register-form').requestSubmit();
       })()`);
       await waitFor(`location.pathname.endsWith('/${page}-dashboard.html') && typeof Session!=='undefined' && Session.role()==='${role}' && document.querySelector('.sidebar-user-role')?.textContent==='${label}'`, role+' registration did not reach correct dashboard');
       const registered=await evaluate(`(async()=>{const p=await Api.get('/profile');return {role:p.user.role,volunteer:!!p.user.volunteer};})()`);
       assert.equal(registered.role,role);
       if(role==='volunteer') {
+        assert.equal(await evaluate(`(async()=>{const p=await Api.get('/profile');return p.user.volunteer?.availability_status==='unavailable' && document.getElementById('vol-status-select').value==='unavailable';})()`),true);
         assert.equal(await evaluate(`(async()=>{const d=await Api.get('/volunteer/tasks');return d.success && Array.isArray(d.tasks);})()`),true);
+        assert.equal(await evaluate(`(async()=>{const d=await Api.put('/volunteer/update-location',{latitude:0,longitude:0});return d.success && d.volunteer.last_location_lat===0 && d.volunteer.last_location_lng===0;})()`),true);
+        await send('Page.navigate',{url:origin+'/volunteer-dashboard.html'});
+        await waitFor(`document.readyState==='complete' && typeof volunteerLat!=='undefined' && volunteerLat===0 && volunteerLng===0 && document.getElementById('vol-status-select')?.value==='unavailable'`, 'Saved volunteer GPS/readiness did not survive reload with permission denied');
+      }
+      if(role==='ngo') {
+        assert.equal(await evaluate(`(async()=>{const s=document.getElementById('ngo-status-select');s.value='unavailable';await updateNGOStatusSelect(s);const p=await Api.get('/profile');return p.user.availability==='unavailable';})()`),true);
+        await send('Page.navigate',{url:origin+'/ngo-dashboard.html'});
+        await waitFor(`document.readyState==='complete' && document.getElementById('ngo-status-select')?.value==='unavailable'`, 'NGO readiness did not survive reload');
       }
       await logout();
       // A stale role key alone must not influence a fresh login response.
@@ -160,8 +171,73 @@ async function main() {
       await waitFor(`location.pathname.endsWith('/${page}-dashboard.html') && typeof Session!=='undefined' && Session.role()==='${role}' && document.querySelector('.sidebar-user-role')?.textContent==='${label}'`, role+' login did not reach correct dashboard');
       assert.equal(await evaluate(`(async()=>{const p=await Api.get('/profile');return p.user.role;})()`),role);
       if(role==='volunteer') {
+        assert.equal(await evaluate(`(async()=>{const p=await Api.get('/profile');return p.user.volunteer?.availability_status==='unavailable' && p.user.volunteer?.last_location_lat===0 && document.getElementById('vol-status-select').value==='unavailable';})()`),true);
         await send('Page.navigate',{url:origin+'/user-dashboard.html'});
         await waitFor(`location.pathname.endsWith('/volunteer-dashboard.html') && typeof Session!=='undefined' && Session.role()==='volunteer'`, 'Wrong-dashboard guard failed');
+        if (!warmCache) {
+          assert.equal(await evaluate(`(async()=>{
+            const select=document.getElementById('vol-status-select');select.value='available';
+            await updateVolunteerStatusSelect(select);
+            const location=await Api.put('/volunteer/update-location',{latitude:12.9716,longitude:77.5946});
+            return select.value==='available' && location.success;
+          })()`),true);
+          await send('Page.reload');
+          await waitFor(`document.querySelector('.request-card button[onclick="acceptTask(${demoRequestId})"]')`, 'Nearby SOS was not offered to volunteer');
+          await evaluate(`document.querySelector('.request-card button[onclick="acceptTask(${demoRequestId})"]').click()`);
+          await waitFor(`document.getElementById('tasks-tbody')?.textContent.includes('Mark En Route')`, 'Volunteer acceptance did not create assignment');
+          demoTaskId = await evaluate(`(async()=>{const data=await Api.get('/volunteer/tasks');return data.tasks[0].task_id;})()`);
+          assert.ok(Number.isInteger(demoTaskId));
+          await evaluate(`document.querySelector('#tasks-tbody button').click()`);
+          await waitFor(`document.getElementById('tasks-tbody')?.textContent.includes('Mark On Site')`, 'En Route transition did not render');
+          await evaluate(`document.querySelector('#tasks-tbody button').click()`);
+          await waitFor(`document.getElementById('tasks-tbody')?.textContent.includes('On Site')`, 'On Site transition did not render');
+          await evaluate(`(async () => {
+            const canvas=document.createElement('canvas');canvas.width=2;canvas.height=2;
+            const blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/png'));
+            const transfer=new DataTransfer();transfer.items.add(new File([blob],'proof.png',{type:'image/png'}));
+            document.getElementById('proof_img_${demoTaskId}').files=transfer.files;
+            document.getElementById('proof_notes_${demoTaskId}').value='Synthetic browser completion';
+            document.querySelector('#tasks-tbody form').requestSubmit();
+          })()`);
+          await delay(300);
+          const proofState = await evaluate(`(async()=>{
+            const data=await Api.get('/volunteer/tasks');
+            return {status:data.tasks[0]?.status,
+              notices:[...document.querySelectorAll('.toast-msg')].map(t=>t.textContent)};
+          })()`);
+          assert.equal(proofState.status,'Proof Submitted',JSON.stringify(proofState));
+          await waitFor(`document.getElementById('tasks-tbody')?.textContent.includes('Pending Admin')`, 'Proof submission did not await admin');
+          console.log('PASS real browser/API: volunteer accepted, progressed and submitted proof');
+        }
+      }
+      if (role === 'ngo') {
+        assert.equal(await evaluate(`(async()=>{const p=await Api.get('/profile');return p.user.availability==='unavailable' && document.getElementById('ngo-status-select').value==='unavailable';})()`),true);
+        if (!warmCache) {
+          assert.ok(await evaluate(`document.getElementById('alloc-request').innerHTML.includes('value="${demoRequestId}"')`),
+            'Active assigned SOS should remain available for NGO allocation');
+          await evaluate(`(async()=>{
+            document.getElementById('res-name').value='Synthetic water';
+            document.getElementById('res-category').value='Food';
+            document.getElementById('res-quantity').value='4';
+            document.getElementById('res-unit').value='cases';
+            document.getElementById('res-location').value='Fixture store';
+            await addResource();
+          })()`);
+          const resourceId = await evaluate(`(async()=>{const data=await Api.get('/ngo/resources');return data.resources[0].resource_id;})()`);
+          await evaluate(`(async()=>{
+            editResource(${resourceId});
+            document.getElementById('edit-resource-quantity').value='6';
+            document.getElementById('edit-resource-location').value='Updated fixture store';
+            await saveResourceEdit();
+            document.getElementById('alloc-resource').value='${resourceId}';
+            document.getElementById('alloc-request').value='${demoRequestId}';
+            await allocateResource();
+          })()`);
+          assert.equal(await evaluate(`(async()=>{const d=await Api.get('/ngo/resources');return d.resources[0].quantity===6 && d.resources[0].allocated_to===${demoRequestId};})()`),true);
+          await send('Page.reload');
+          await waitFor(`document.getElementById('inventory-tbody')?.textContent.includes('Updated fixture store')`, 'NGO inventory did not survive reload');
+          console.log('PASS real browser/API: NGO created, edited, allocated and reloaded inventory');
+        }
       }
       if (role === 'reporter') {
         // The reported manual-URL redirect is correct for a reporter, even if
@@ -169,9 +245,50 @@ async function main() {
         await evaluate(`const cached=Session.get();cached.role='volunteer';localStorage.setItem('resqnet_user',JSON.stringify(cached));localStorage.setItem('resqnet_role','volunteer');`);
         await send('Page.navigate', {url:origin+'/volunteer-dashboard.html'});
         await waitFor(`location.pathname.endsWith('/user-dashboard.html') && typeof Session!=='undefined' && Session.role()==='reporter'`, 'Reporter entered the volunteer page despite the database role');
+        if (!warmCache) {
+          await send('Page.navigate', {url:origin+'/help-request.html'});
+          await waitFor(`document.readyState==='complete' && typeof setLocationFields==='function'`, 'SOS form did not load');
+          await evaluate(`(() => {
+            document.getElementById('req-name').value='Browser fixture';
+            document.getElementById('req-contact').value='0000000000';
+            document.getElementById('request-type').value='Rescue';
+            document.getElementById('people-count').value='2';
+            document.getElementById('req-description').value='Synthetic browser rescue';
+            setLocationFields(12.9716, 77.5946, 'Synthetic browser location');
+            document.getElementById('help-form').requestSubmit();
+          })()`);
+          await waitFor(`document.getElementById('success-state')?.style.display==='flex'`, 'Real SOS form did not submit');
+          demoRequestId = await evaluate(`(async()=>{const data=await Api.get('/help-requests');return data.requests[0].request_id;})()`);
+          assert.ok(Number.isInteger(demoRequestId));
+          console.log('PASS real browser/API: citizen SOS form created a private request');
+        }
+      }
+      if (role === 'admin' && !warmCache) {
+        await waitFor(`document.getElementById('verifications-tbody')?.textContent.includes('Synthetic browser completion')`, 'Admin did not see pending proof');
+        await waitFor(`document.getElementById('admin-users-tbody')?.textContent.includes('Browser fixture')`, 'Admin users did not load');
+        await waitFor(`document.getElementById('admin-resources-tbody')?.textContent.includes('Synthetic water')`, 'Admin resources did not load');
+        await evaluate(`document.querySelector('#verifications-tbody button[onclick^="viewTaskProof"]').click()`);
+        await waitFor(`!!document.querySelector('dialog[open] img')`, 'Admin could not open protected proof');
+        await evaluate(`document.querySelector('dialog[open] button').click();window.confirm=()=>true;
+          document.querySelector('#verifications-tbody button[onclick*="Approve"]').click()`);
+        await waitFor(`document.getElementById('verifications-tbody')?.textContent.includes('No pending verifications')`, 'Admin approval did not clear pending proof');
+        assert.equal(await evaluate(`(async()=>{const d=await Api.get('/admin/requests');return d.requests.find(r=>r.request_id===${demoRequestId})?.status;})()`),'Completed');
+        console.log('PASS real browser/API: admin viewed private proof and approved completion');
       }
       await logout();
       console.log('PASS real auth browser: '+role+' registration, database profile, login redirect, dashboard and logout');
+    }
+    if (!warmCache) {
+      await evaluate(`(() => {
+        document.getElementById('login-email').value='reporter@test.invalid';
+        document.getElementById('login-password').value='isolated-browser-password';
+        document.getElementById('login-form').requestSubmit();
+      })()`);
+      await waitFor(`location.pathname.endsWith('/user-dashboard.html') && document.getElementById('requests-tbody')?.textContent.includes('Completed')`,
+        'Citizen dashboard did not show approved completion');
+      assert.equal(await evaluate(`(async()=>{const d=await Api.get('/help-request/${demoRequestId}');return d.request.status;})()`),'Completed');
+      await logout();
+      console.log('PASS real browser/API: citizen re-login shows completed rescue');
     }
     if (warmCache) {
       assert.deepEqual(registrationRoles, ['volunteer']);

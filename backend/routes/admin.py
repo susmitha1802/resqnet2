@@ -14,7 +14,8 @@ from sqlalchemy.exc import SQLAlchemyError
 from datetime import datetime, timedelta, timezone
 
 from extensions import db
-from models import User, HelpRequest, DisasterReport, Volunteer, ReliefTask
+from models import User, HelpRequest, DisasterReport, Volunteer, ReliefTask, ReliefResource
+from access import request_view, report_view
 from routes.middleware import require_role
 from sos_lifecycle import TransitionConflict, transition, proof_file, ACTIVE_TASK_STATES
 
@@ -59,7 +60,7 @@ def admin_dashboard():
 
     return _success({
         'stats':       stats,
-        'recent_high': [r.to_dict() for r in recent_high],
+        'recent_high': [request_view(r, db.session.get(User, int(get_jwt_identity()))) for r in recent_high],
     })
 
 
@@ -129,7 +130,7 @@ def admin_reports():
     total   = query.count()
     reports = query.offset(offset).limit(limit).all()
 
-    return _success({'reports': [r.to_dict() for r in reports], 'total': total,
+    return _success({'reports': [report_view(r, r.user) for r in reports], 'total': total,
                      'limit': limit, 'offset': offset})
 
 
@@ -151,7 +152,7 @@ def admin_requests():
     total    = query.count()
     requests = query.offset(offset).limit(limit).all()
 
-    return _success({'requests': [r.to_dict() for r in requests], 'total': total,
+    return _success({'requests': [request_view(r, r.user) for r in requests], 'total': total,
                      'limit': limit, 'offset': offset})
 
 
@@ -177,6 +178,25 @@ def admin_users():
         'users': [u.to_dict() for u in users],
         'total': len(users),
     })
+
+
+@admin_bp.route('/admin/resources', methods=['GET'])
+@require_role('admin')
+def admin_resources():
+    """Read-only inventory and allocation overview for coordinators."""
+    try:
+        limit = int(request.args.get('limit', 100))
+        offset = int(request.args.get('offset', 0))
+    except ValueError:
+        return _error('Invalid resource page')
+    if not 1 <= limit <= 500 or offset < 0:
+        return _error('Invalid resource page')
+    resources = ReliefResource.query.order_by(ReliefResource.added_at.desc(),
+                                              ReliefResource.resource_id.desc()).offset(offset).limit(limit).all()
+    return _success({'resources': [{**r.to_dict(),
+                                   'ngo_name': r.added_by_user.location or r.added_by_user.name}
+                                  for r in resources], 'total': ReliefResource.query.count(),
+                     'limit': limit, 'offset': offset})
 
 
 # ── GET /admin/pending-verifications ───────────────────────────────────────────
@@ -217,6 +237,7 @@ def verify_task(task_id):
         if approved:
             values['completed_tasks'] = Volunteer.completed_tasks + 1
         db.session.execute(update(Volunteer).where(Volunteer.volunteer_id == task.volunteer_id).values(**values))
+        task.volunteer.user.availability = 'available' if approved and not other_active else 'unavailable'
         db.session.commit()
     except (TransitionConflict, SQLAlchemyError) as exc:
         db.session.rollback()
@@ -229,13 +250,21 @@ def verify_task(task_id):
 @admin_bp.route('/admin/report/<int:report_id>/override', methods=['PUT'])
 @require_role('admin')
 def override_report(report_id):
-    data = request.get_json(silent=True) or {}
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return _error('A JSON object with disaster_type is required')
     new_type = data.get('disaster_type')
-    
-    report = db.get_or_404(DisasterReport, report_id)
-    if new_type:
-        report.disaster_type = new_type
+    valid_types = DisasterReport.__table__.c.disaster_type.type.enums
+    if not isinstance(new_type, str) or new_type.strip() not in valid_types:
+        return _error('disaster_type must be one of: ' + ', '.join(valid_types))
+
+    try:
+        report = db.get_or_404(DisasterReport, report_id)
+        report.disaster_type = new_type.strip()
+        db.session.flush()
+        report_data = report_view(report, report.user)
         db.session.commit()
-        return _success({'report': report.to_dict()}, 'Report overridden successfully')
-    
-    return _error('disaster_type is required')
+    except SQLAlchemyError:
+        db.session.rollback()
+        return _error('Report override could not be saved. Please retry.', 503)
+    return _success({'report': report_data}, 'Report overridden successfully')

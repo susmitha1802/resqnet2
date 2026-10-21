@@ -72,7 +72,8 @@ test('volunteer task lists load despite pending GPS and failures show an error',
   let init;
   const target = { innerHTML: '', textContent: '' }, calls = [];
   const context = { window: {}, console, document: { addEventListener: (_, fn) => { init = fn; }, getElementById: () => target },
-    Session: { verifyRole: async () => true }, Api: { get: async () => null } };
+    Session: { verifyRole: async () => true, get: () => ({ volunteer: { availability_status: 'available' } }) },
+    Api: { get: async () => null } };
   vm.createContext(context); vm.runInContext(source('volunteer-dashboard.js'), context);
   assert.equal(await context.loadMyTasks(), false);
   assert.match(target.innerHTML, /Unable to load assigned tasks/);

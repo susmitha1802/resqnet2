@@ -10,6 +10,7 @@ load_dotenv(Path(__file__).with_name('.env'), override=False)
 class Config:
     # Flask
     APP_ENV = 'production' if os.getenv('RENDER', '').lower() == 'true' else os.getenv('APP_ENV', 'development').lower()
+    RUNNING_ON_RENDER = os.getenv('RENDER', '').lower() == 'true'
     SECRET_KEY = os.getenv('SECRET_KEY')
     DEBUG = os.getenv('FLASK_DEBUG', 'False') == 'True'
     SEED_DEMO_DATA = os.getenv('SEED_DEMO_DATA', 'False') == 'True'
@@ -38,6 +39,11 @@ class Config:
         "http://127.0.0.1:5500,http://localhost:5500,https://resqnet1-2026.netlify.app"
     )
     CORS_ORIGINS = [o.strip() for o in _cors.split(",")]
+
+    # Redis-compatible shared counters are required in production, never memory fallback.
+    RATELIMIT_STORAGE_URI = os.getenv('RATELIMIT_STORAGE_URI', 'memory://')
+    RATELIMIT_ENABLED = True
+    TRUSTED_PROXY_HOPS = int(os.getenv('TRUSTED_PROXY_HOPS', '0'))
 
     # Maps & Geocoding (Currently Leaflet + Nominatim are free, but keys can be provided for Mapbox/LocationIQ)
     MAP_PROVIDER = os.getenv('MAP_PROVIDER', 'leaflet')

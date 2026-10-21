@@ -73,7 +73,7 @@ def save_proof(upload):
         if image_format not in {'PNG', 'JPEG'}:
             raise ValueError('Only PNG or JPEG proof images are supported.')
         upload.stream.seek(0)
-    except (UnidentifiedImageError, OSError, Image.DecompressionBombError) as exc:
+    except (UnidentifiedImageError, OSError, SyntaxError, Image.DecompressionBombError) as exc:
         raise ValueError('Proof image is invalid. Use a PNG or JPEG image.') from exc
     name = uuid4().hex + ('.png' if image_format == 'PNG' else '.jpg')
     folder = proof_directory()

@@ -9,6 +9,33 @@ const Api = {
   /** Centralized base URL — use Api.BASE everywhere instead of hardcoding */
   BASE: API_BASE,
 
+  async viewPrivateImage(path) {
+    if (!/^\/(?:report|help-request)\/\d+\/image$/.test(path || '')) return false;
+    const response = await this.fetchWithTimeout(`${this.BASE}${path}`, {
+      headers: { Authorization: `Bearer ${this.getToken() || ''}` }
+    });
+    if (!response.ok) throw new Error('Image unavailable or access denied.');
+    const blob = await response.blob();
+    if (!['image/png', 'image/jpeg'].includes(blob.type)) throw new Error('Image format is unsupported.');
+    const url = URL.createObjectURL(blob);
+    const dialog = document.createElement('dialog');
+    dialog.style.cssText = 'max-width:min(92vw,900px);max-height:92vh;background:#111827;color:white;border:1px solid #64748b;border-radius:8px;padding:16px';
+    const close = document.createElement('button');
+    close.textContent = 'Close image';
+    close.type = 'button';
+    const image = document.createElement('img');
+    image.src = url;
+    image.alt = 'Private incident evidence';
+    image.style.cssText = 'display:block;max-width:100%;max-height:75vh;object-fit:contain;margin-top:12px';
+    dialog.append(close, image);
+    document.body.append(dialog);
+    const dismiss = () => { dialog.close(); dialog.remove(); URL.revokeObjectURL(url); };
+    close.addEventListener('click', dismiss);
+    dialog.addEventListener('cancel', event => { event.preventDefault(); dismiss(); });
+    dialog.showModal();
+    return true;
+  },
+
   /** Get JWT token from localStorage */
   getToken() {
     return localStorage.getItem('resqnet_token');
@@ -38,6 +65,27 @@ const Api = {
       }
       throw err;
     }
+  },
+
+  /** Notification controls require both a successful HTTP status and API result. */
+  async notificationRequest(endpoint, method = 'GET', body) {
+    const response = await this.fetchWithTimeout(`${this.BASE}${endpoint}`, {
+      method, headers: this.headers(),
+      ...(body === undefined ? {} : { body: JSON.stringify(body) })
+    });
+    if (response.status === 401 || response.status === 422) {
+      Session.logout('Session expired. Please log in again.');
+    }
+    let data;
+    try { data = await response.json(); }
+    catch (_) { throw new Error('Could not confirm the server result. Reload before retrying.'); }
+    if (!response.ok || data?.success !== true) {
+      const error = new Error(typeof data?.message === 'string' ? data.message
+        : `Notification request failed (HTTP ${response.status}). Reload before retrying.`);
+      error.status = response.status;
+      throw error;
+    }
+    return data;
   },
 
   /** GET request */

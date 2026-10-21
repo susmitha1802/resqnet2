@@ -123,7 +123,7 @@ class DisasterReport(db.Model):
         self.severity                = severity
 
     def to_dict(self) -> dict:
-        # AI mismatch: True when CNN prediction differs from user-reported type
+        # Legacy type comparison, retained for compatibility, not independent inference.
         predicted = (self.predicted_disaster_type or '').strip().lower()
         reported  = (self.disaster_type or '').strip().lower()
         ai_mismatch = bool(
@@ -138,8 +138,11 @@ class DisasterReport(db.Model):
             'description':   self.description,
             'image_path':    self.image_path,
             'predicted_disaster_type': self.predicted_disaster_type,
-            'prediction_confidence': self.prediction_confidence,
+            # No evaluated/calibrated model is connected, including for legacy rows.
+            'prediction_confidence': None,
             'severity':      self.severity,
+            'severity_method': 'Rule-based severity estimate (unvalidated)',
+            'independently_verified': False,
             'latitude':      float(self.latitude),
             'longitude':     float(self.longitude),
             'created_at':    self.created_at.isoformat() + 'Z' if self.created_at else None,

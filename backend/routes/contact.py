@@ -6,6 +6,7 @@ PUT  /admin/contact-messages/<id>/read
 DELETE /admin/contact-messages/<id>
 """
 from flask import Blueprint, request, jsonify
+from sqlalchemy.exc import SQLAlchemyError
 
 
 from extensions import db
@@ -23,7 +24,11 @@ def _error(message='Error', status=400):
 # ── POST /contact ─────────────────────────────────────────────────────────────
 @contact_bp.route('/contact', methods=['POST'])
 def submit_contact():
-    data = request.get_json(silent=True) or {}
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return _error('A JSON object is required')
+    if any(not isinstance(data.get(key), str) for key in ('name', 'email', 'subject', 'message')):
+        return _error('Name, email, subject, and message must be strings')
     
     name    = data.get('name', '').strip()
     email   = data.get('email', '').strip().lower()
@@ -32,6 +37,8 @@ def submit_contact():
     
     if not all([name, email, subject, message]):
         return _error('Name, email, subject, and message are required')
+    if len(name) > 100 or len(email) > 120 or len(subject) > 200:
+        return _error('Contact field is too long')
         
     msg = ContactMessage(
         name=name,
@@ -39,8 +46,12 @@ def submit_contact():
         subject=subject,
         message=message
     )
-    db.session.add(msg)
-    db.session.commit()
+    try:
+        db.session.add(msg)
+        db.session.commit()
+    except SQLAlchemyError:
+        db.session.rollback()
+        return _error('Message could not be saved. Please retry.', 503)
     
     return _success({'contact_message': msg.to_dict()}, 'Message submitted successfully', 201)
 

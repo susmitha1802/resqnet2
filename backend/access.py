@@ -21,6 +21,8 @@ def request_view(req, user=None):
     if can_view_private_request(user, req):
         data = req.to_dict()
         data.pop('image_path', None)
+        if user.role == 'admin' or req.user_id == user.user_id:
+            data['image_url'] = f'/help-request/{req.request_id}/image' if req.image_path else None
         return data
     data = req.to_dict()
     allowed = {'request_id', 'request_type', 'priority_level', 'number_of_people',
@@ -37,6 +39,7 @@ def report_view(report, user=None):
     if user and (user.role == 'admin' or user.user_id == report.user_id):
         # Stored uploads are private filesystem paths, not browser URLs.
         data.pop('image_path', None)
+        data['image_url'] = f'/report/{report.report_id}/image' if report.image_path else None
         return data
     allowed = {'report_id', 'disaster_type', 'severity', 'latitude', 'longitude',
                'created_at', 'source', 'status', 'is_demo'}

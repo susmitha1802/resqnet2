@@ -133,17 +133,7 @@
     </div>
 
     <!-- PREPAREDNESS PING BANNER (shown when there's an alert for this volunteer) -->
-    <div id="ping-banner" style="display:none;" class="ping-banner">
-      <div style="font-weight:700;font-size:1rem;color:#ef4444;margin-bottom:8px;">🔔 Preparedness Alert</div>
-      <div id="ping-description" style="color:var(--text-secondary);margin-bottom:12px;">A weather alert has been issued
-        for your area. Please confirm your availability.</div>
-      <div style="display:flex;gap:10px;">
-        <button class="btn-resq" onclick="respondToPing('Acknowledged')" style="padding:8px 20px;">✓ I'm Ready &amp;
-          Available</button>
-        <button class="btn-resq-outline" onclick="respondToPing('Unavailable')" style="padding:8px 20px;">✗ Unavailable
-          Right Now</button>
-      </div>
-    </div>
+    <div id="ping-banner" style="display:none;" class="ping-banner" aria-live="polite"></div>
 
     <!-- STATS ROW -->
     <div class="stats-grid-4 mb-24">
@@ -194,7 +184,7 @@
           <select class="resq-select" id="vol-status-select" onchange="updateVolunteerStatusSelect(this)"
             style="width:auto;min-width:180px;">
             <option value="available">🟢 Ready (Available)</option>
-            <option value="on_task">🟡 On Task</option>
+            <option value="on_task" disabled>🟡 On Task</option>
             <option value="unavailable">⚪ Unavailable</option>
           </select>
         </div>
@@ -332,39 +322,6 @@
       update(); setInterval(update, 1000);
     }
 
-    /* Ping banner */
-    let currentPingId = null;
-    async function loadMyPings() {
-      const token = Session.getToken();
-      try {
-        const res = await fetch(`${API_BASE}/preparedness/my-pings`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        const data = await res.json();
-        const pings = (data.pings || []).filter(p => p.status === 'Sent');
-        if (pings.length > 0) {
-          currentPingId = pings[0].ping_id;
-          document.getElementById('ping-banner').style.display = 'block';
-        }
-      } catch (e) { }
-    }
-
-    async function respondToPing(status) {
-      if (!currentPingId) return;
-      const token = Session.getToken();
-      try {
-        await fetch(`${API_BASE}/preparedness/ping/${currentPingId}`, {
-          method: 'PUT',
-          headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ status })
-        });
-        document.getElementById('ping-banner').style.display = 'none';
-        Toast.show(status === 'Acknowledged' ? '✅ Marked as Ready!' : 'Status updated', 'success');
-      } catch (e) {
-        Toast.show('Failed to update status', 'danger');
-      }
-    }
-
     /* Weather alerts */
     async function loadVolAlerts() {
       const token = Session.getToken();
@@ -394,7 +351,6 @@
         const sun = document.getElementById('sidebar-username');
         if (sun) sun.textContent = user.name;
       }
-      loadMyPings();
       loadVolAlerts();
     });
 

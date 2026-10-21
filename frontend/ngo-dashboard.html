@@ -823,6 +823,16 @@
                 </div>
 
                 <!-- Inventory Table -->
+                <div class="add-resource-form" id="edit-resource-form">
+                    <div class="add-form-title">Edit unallocated resource <span id="edit-resource-label"></span></div>
+                    <input type="hidden" id="edit-resource-id">
+                    <div class="add-form-grid">
+                        <label>Quantity <input type="number" class="resq-input" id="edit-resource-quantity" min="1" step="1"></label>
+                        <label>Warehouse / location <input type="text" class="resq-input" id="edit-resource-location" maxlength="200"></label>
+                    </div>
+                    <button class="btn btn-success btn-sm" onclick="saveResourceEdit()">Save changes</button>
+                    <button class="btn btn-ghost btn-sm" onclick="document.getElementById('edit-resource-form').classList.remove('open')">Cancel</button>
+                </div>
                 <div class="resq-table-wrapper">
                     <table class="resq-table">
                         <thead>

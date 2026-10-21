@@ -112,12 +112,12 @@
       <div class="success-state" id="success-state">
         <div class="success-icon">✅</div>
         <h3 style="font-weight:800;margin-bottom:12px">Report Submitted!</h3>
-        <p style="color:var(--text-secondary);max-width:380px;margin-bottom:18px">Your disaster report has been received. Relief agencies and volunteers have been notified and will respond shortly.</p>
+        <p style="color:var(--text-secondary);max-width:380px;margin-bottom:18px">Your community report has been received. Submit an SOS assistance request if you need help.</p>
         <div id="ai-result-box" style="display:none;background:rgba(0,180,255,0.08);border:1px solid rgba(0,180,255,0.2);padding:16px;border-radius:var(--radius);margin-bottom:28px;max-width:400px;width:100%">
-          <div style="font-size:0.75rem;color:var(--accent-blue);font-weight:700;margin-bottom:4px;text-transform:uppercase;letter-spacing:1px">🤖 AI Damage Analysis</div>
+          <div style="font-size:0.75rem;color:var(--accent-blue);font-weight:700;margin-bottom:4px;text-transform:uppercase;letter-spacing:1px">Community report summary</div>
           <div style="font-size:1.05rem;font-weight:700" id="ai-prediction-text"></div>
-          <div style="font-size:0.82rem;color:var(--text-muted);margin-top:2px">Confidence: <span id="ai-confidence-text"></span>%</div>
-          <div style="font-size:0.78rem;color:var(--text-muted);margin-top:6px;display:none" id="ai-note-text"></div>
+          <div style="font-size:0.82rem;color:var(--text-muted);margin-top:2px" id="report-severity-text">Rule-based severity estimate</div>
+          <div style="font-size:0.78rem;color:var(--text-muted);margin-top:6px" id="ai-note-text">Not independently verified.</div>
         </div>
         <div class="flex gap-12" style="flex-wrap:wrap;justify-content:center">
           <a href="help-request.html" class="btn btn-primary">🆘 Request Help Now</a>
@@ -172,18 +172,18 @@
         <!-- Step 3: Media & Location -->
         <div class="resq-card mb-20">
           <h6 style="font-weight:700;margin-bottom:4px">Step 3: Upload Media &amp; Capture Location *</h6>
-          <p style="color:var(--text-muted);font-size:0.8rem;margin-bottom:18px">Images help AI assess damage severity and assist relief agencies</p>
+          <p style="color:var(--text-muted);font-size:0.8rem;margin-bottom:18px">Images support community observations. Any rule-based severity estimate is unvalidated and does not confirm damage.</p>
 
           <div class="resq-form-group">
-            <label class="resq-label">Upload Images / Videos (up to 5 files, max 10MB each)</label>
-            <div class="file-upload-area" id="file-drop-area" onclick="document.getElementById('file-input').click()">
+            <label class="resq-label">Optional evidence image (one JPG or PNG, max 10MB)</label>
+            <div class="file-upload-area" id="file-drop-area">
               <div class="file-upload-icon">📸</div>
               <div class="file-upload-text">
                 Drag &amp; drop files here or <span>Browse</span>
               </div>
-              <div style="color:var(--text-muted);font-size:0.72rem;margin-top:5px">JPG, PNG, MP4, MOV — Max 10MB each</div>
+              <div style="color:var(--text-muted);font-size:0.72rem;margin-top:5px">JPG or PNG — one image, max 10MB</div>
             </div>
-            <input type="file" id="file-input" accept="image/*,video/*" multiple style="display:none">
+            <input type="file" id="file-input" accept="image/jpeg,image/png" style="display:none">
             <div id="file-preview" style="margin-top:10px;display:flex;flex-wrap:wrap;gap:8px"></div>
           </div>
 
@@ -193,6 +193,7 @@
             <div style="position:relative;margin-bottom:10px">
               <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--text-muted);pointer-events:none">🔍</span>
               <input id="loc-search-input" class="resq-input" placeholder="Search address…" autocomplete="off" style="padding-left:36px">
+              <button type="button" id="loc-search-input-button" class="btn-resq-outline">Search address</button>
               <div id="loc-search-results" style="display:none;position:absolute;top:calc(100% + 6px);left:0;right:0;background:var(--bg-card);border:1px solid rgba(255,45,85,0.2);border-radius:var(--radius-sm);z-index:1000;max-height:200px;overflow-y:auto;box-shadow:var(--shadow-lg)"></div>
             </div>
             <!-- Map -->
@@ -238,7 +239,7 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="js/api.js"></script>
 <script src="js/main.js"></script>
-<script src="js/leaflet-map.js?v=location-1"></script>
+<script src="js/leaflet-map.js?v=geocode-2"></script>
 <script src="js/report.js?v=location-1"></script>
 </body>
 </html>

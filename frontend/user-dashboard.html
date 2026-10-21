@@ -56,18 +56,17 @@
   <div class="dashboard-header">
     <div>
       <div class="dashboard-title">My Dashboard</div>
-      <div class="dashboard-subtitle">Track your help requests and AI analysis results</div>
+      <div class="dashboard-subtitle">Track your help requests and community reports</div>
     </div>
     <div class="flex items-center gap-12">
       <div class="notif-wrapper" id="notif-wrapper">
         <div class="notif-bell" id="notif-bell" onclick="toggleNotifDropdown()">
           🔔
-          <div class="notif-badge" id="notif-badge">3</div>
+          <div class="notif-badge" id="notif-badge" style="display:none"></div>
         </div>
         <div class="notif-dropdown" id="notif-dropdown">
           <div class="notif-header">
-            <div class="notif-header-title">🔔 Notifications</div>
-            <button class="notif-clear-btn" onclick="clearNotifications()">Mark all read</button>
+            <div class="notif-header-title">Request progress snapshots</div>
           </div>
           <div class="notif-list" id="notif-list">
             <div class="notif-empty">⏳ Loading...</div>
@@ -119,7 +118,7 @@
 
   <!-- Main Grid -->
   <div class="dashboard-grid-main">
-    <!-- Left: Request History + Timeline + AI -->
+    <!-- Left: Request History + Timeline + Report Details -->
     <div>
       <!-- Request History -->
       <div class="resq-card mb-20">
@@ -151,7 +150,7 @@
           <table class="resq-table">
             <thead><tr>
               <th>Request ID</th><th>Type</th><th>Priority</th>
-              <th>Status</th><th>Submitted</th><th>AI Result</th>
+              <th>Status</th><th>Submitted</th><th>Map</th>
             </tr></thead>
             <tbody id="requests-tbody">
               <tr><td colspan="6" style="text-align:center;padding:30px;color:var(--text-muted)">Loading...</td></tr>
@@ -180,8 +179,8 @@
         <div class="resq-table-wrapper">
           <table class="resq-table">
             <thead><tr>
-              <th>Type</th><th>Severity</th><th>Location</th>
-              <th>AI Analysis</th><th>Submitted</th><th>Action</th>
+              <th>Community-reported type</th><th>Rule-based severity estimate</th><th>Location</th>
+              <th>Report status</th><th>Submitted</th><th>Action</th>
             </tr></thead>
             <tbody id="disasters-tbody">
               <tr><td colspan="6" style="text-align:center;padding:30px;color:var(--text-muted)">Loading...</td></tr>
@@ -190,16 +189,16 @@
         </div>
       </div>
 
-      <!-- AI Results Panel -->
+      <!-- Report Details Panel -->
       <div class="resq-card" id="profile-section">
         <div class="flex items-center justify-between mb-20" style="flex-wrap:wrap;gap:10px">
-          <h6 style="font-weight:700;margin:0">🤖 AI Analysis Result</h6>
-          <span style="font-size:0.72rem;color:var(--text-muted)">Click "AI Result" on any request</span>
+          <h6 style="font-weight:700;margin:0">Report details</h6>
+          <span style="font-size:0.72rem;color:var(--text-muted)">Click "Report details" on a disaster report</span>
         </div>
         <div id="ai-result-panel" class="ai-panel">
-          <div class="ai-panel-title">🤖 AI ANALYSIS ENGINE</div>
+          <div class="ai-panel-title">Community observations</div>
           <div style="text-align:center;padding:20px;color:var(--text-muted);font-size:0.875rem">
-            Select a request above to view AI analysis
+            Select a disaster report above. Reports and severity estimates are not independently verified.
           </div>
         </div>
       </div>
@@ -232,7 +231,7 @@
             <div class="profile-detail-row">
               <span class="profile-detail-icon">📅</span>
               <span class="profile-detail-label">Member since</span>
-              <span class="profile-detail-value">June 2024</span>
+              <span class="profile-detail-value" id="profile-member-since">—</span>
             </div>
           </div>
         </div>

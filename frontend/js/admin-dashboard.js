@@ -8,6 +8,7 @@ let chartStatus = null;
 let chartTrend = null;
 let chartDisasters = null;
 let allRequests = [];
+let adminResourceOffset = 0;
 
 /* ── Chart defaults ── */
 const chartDefaults = {
@@ -241,6 +242,10 @@ async function loadAnalytics() {
 /* ── Load & Render Requests Table ── */
 async function loadRequests() {
   const data = await Api.get('/admin/requests');
+  if (!data?.success || !Array.isArray(data.requests)) {
+    document.getElementById('requests-tbody').innerHTML = '<tr><td colspan="9">Requests unavailable. Retry later.</td></tr>';
+    return;
+  }
   let requests = data?.requests || [];
 
   allRequests = requests;
@@ -252,7 +257,7 @@ function renderRequestsTable(requests) {
   if (!tbody) return;
 
   if (!requests.length) {
-    tbody.innerHTML = `<tr><td colspan="8"><div class="empty-state"><div class="empty-state-icon">📭</div><div class="empty-state-title">No requests yet</div></div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="9"><div class="empty-state"><div class="empty-state-icon">📭</div><div class="empty-state-title">No requests yet</div></div></td></tr>`;
     return;
   }
 
@@ -266,6 +271,8 @@ function renderRequestsTable(requests) {
       <td style="color:var(--text-secondary);font-size:0.82rem">${r.latitude?.toFixed(4)}, ${r.longitude?.toFixed(4)}</td>
       <td style="color:var(--text-muted);font-size:0.78rem">${timeAgo(r.created_at)}</td>
       <td>${r.number_of_people}</td>
+      <td>${r.status === 'Duplicate' ? `<button class="btn-resq-outline" onclick="restoreDuplicate(${r.request_id})">Restore pending</button>` : ''}
+      ${r.image_url ? `<button class="btn-resq-outline" onclick="viewIncidentImage('${r.image_url}')">Image</button>` : ''}</td>
     </tr>
   `).join('');
 }
@@ -273,13 +280,14 @@ function renderRequestsTable(requests) {
 /* ── Fetch Disaster Reports ── */
 async function loadDisasters() {
   try {
-    const data = await Api.get('/reports');
+    const data = await Api.get('/admin/reports');
+    if (!data?.success || !Array.isArray(data.reports)) throw new Error('Reports unavailable');
     const reports = data?.reports || [];
     const tbody = document.getElementById('disasters-tbody');
     if (!tbody) return;
 
     if (reports.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:30px;color:var(--text-muted)">No disaster reports found.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:30px;color:var(--text-muted)">No disaster reports found.</td></tr>';
       return;
     }
 
@@ -295,13 +303,16 @@ async function loadDisasters() {
             background:${r.severity.includes('Severe') ? 'rgba(239,68,68,0.2)' : (r.severity.includes('Moderate') ? 'rgba(245,158,11,0.2)' : 'rgba(16,185,129,0.2)')};
             color:${r.severity.includes('Severe') ? '#EF4444' : (r.severity.includes('Moderate') ? '#F59E0B' : '#10B981')}
           ">${r.severity}</span>
+          ${r.image_url ? `<button class="btn-resq-outline" onclick="viewIncidentImage('${r.image_url}')">Image</button>` : ''}
+          <select id="report-type-${r.report_id}" aria-label="Correct report ${r.report_id} type">${['Flood', 'Cyclone', 'Earthquake', 'Landslide', 'Fire'].map(type => `<option value="${type}" ${type === r.disaster_type ? 'selected' : ''}>${type}</option>`).join('')}</select>
+          <button class="btn-resq-outline" onclick="correctReportType(${r.report_id})">Correct type</button>
         </td>
         <td style="color:var(--text-secondary)">📍 ${parseFloat(r.latitude).toFixed(4)}, ${parseFloat(r.longitude).toFixed(4)}</td>
         <td>
           <div style="font-size:0.75rem;line-height:1.4">
-            <strong>AI Analysis</strong><br>
+            <strong>Community-reported</strong><br>
             <span style="color:var(--text-muted)">Status:</span><br>
-            <span style="color:#F59E0B">Pending Manual Verification</span>
+            <span style="color:#F59E0B">Not independently verified</span>
           </div>
         </td>
         <td style="color:var(--text-secondary)">${new Date(r.created_at).toLocaleString()}</td>
@@ -312,7 +323,58 @@ async function loadDisasters() {
     `).join('');
   } catch (err) {
     console.error('Failed to load disasters:', err);
+    const tbody = document.getElementById('disasters-tbody');
+    if (tbody) tbody.innerHTML = '<tr><td colspan="8">Reports unavailable. Retry later.</td></tr>';
   }
+}
+
+async function restoreDuplicate(id) {
+  const result = await Api.put('/help-request/status', { request_id: id, status: 'Pending' });
+  Toast.show(result?.success ? 'Request restored to pending' : (result?.message || 'Could not restore request'), result?.success ? 'success' : 'danger');
+  if (result?.success) { await loadRequests(); await loadDashboard(); }
+}
+
+async function correctReportType(id) {
+  const disaster_type = document.getElementById(`report-type-${id}`)?.value;
+  const result = await Api.put(`/admin/report/${id}/override`, { disaster_type });
+  Toast.show(result?.success ? 'Report type corrected; report remains unverified' : (result?.message || 'Correction failed'), result?.success ? 'success' : 'danger');
+  if (result?.success) { await loadDisasters(); await loadAnalytics(); }
+}
+
+async function viewIncidentImage(path) {
+  try { await Api.viewPrivateImage(path); }
+  catch (error) { Toast.show(error.message || 'Image unavailable', 'danger'); }
+}
+
+async function loadAdminPeople() {
+  const [users, volunteers] = await Promise.all([Api.get('/admin/users'), Api.get('/admin/volunteers')]);
+  const userBody = document.getElementById('admin-users-tbody');
+  const volunteerBody = document.getElementById('admin-volunteers-tbody');
+  if (userBody) userBody.innerHTML = users?.success && Array.isArray(users.users) ? users.users.map(u =>
+    `<tr><td>${u.user_id}</td><td>${escapeProofNotes(u.name)}</td><td>${escapeProofNotes(u.role)}</td><td>${escapeProofNotes(u.availability)}</td></tr>`).join('') || '<tr><td colspan="4">No users</td></tr>' : '<tr><td colspan="4">Users unavailable</td></tr>';
+  if (volunteerBody) volunteerBody.innerHTML = volunteers?.success && Array.isArray(volunteers.volunteers) ? volunteers.volunteers.map(v =>
+    `<tr><td>${v.volunteer_id}</td><td>${escapeProofNotes(v.user_name)}</td><td>${escapeProofNotes(v.availability_status)}</td><td>${v.assigned_tasks}</td><td>${v.completed_tasks}</td></tr>`).join('') || '<tr><td colspan="5">No volunteers</td></tr>' : '<tr><td colspan="5">Volunteers unavailable</td></tr>';
+}
+
+async function loadAdminResources(next = false) {
+  if (!next) adminResourceOffset = 0;
+  const data = await Api.get(`/admin/resources?limit=100&offset=${adminResourceOffset}`);
+  const body = document.getElementById('admin-resources-tbody');
+  const status = document.getElementById('admin-resources-status');
+  const more = document.getElementById('admin-resources-more');
+  if (!body) return;
+  if (!data?.success || !Array.isArray(data.resources)) {
+    if (!next) body.innerHTML = '<tr><td colspan="6">Resources unavailable</td></tr>';
+    if (status) status.textContent = 'Could not load resources. Retry later.';
+    return;
+  }
+  const rows = data.resources.map(r =>
+    `<tr><td>${r.resource_id}</td><td>${escapeProofNotes(r.ngo_name)}</td><td>${escapeProofNotes(r.name)}</td><td>${r.quantity} ${escapeProofNotes(r.unit)}</td><td>${escapeProofNotes(r.location || '—')}</td><td>${r.allocated_to ? `#${r.allocated_to}` : 'Available'}</td></tr>`).join('');
+  body.innerHTML = next ? body.innerHTML + rows : rows || '<tr><td colspan="6">No resources</td></tr>';
+  adminResourceOffset += data.resources.length;
+  const total = Number.isInteger(data.total) ? data.total : adminResourceOffset;
+  if (status) status.textContent = `Showing ${adminResourceOffset} of ${total} resources`;
+  if (more) more.style.display = adminResourceOffset < total ? 'inline-block' : 'none';
 }
 
 /* ── Fetch Contact Messages ── */
@@ -548,7 +610,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     loadVerifications(),
     loadAlerts(),
     loadWeather(),
-    loadPreparednessData()
+    loadPreparednessData(),
+    loadAdminPeople(),
+    loadAdminResources()
   ]);
   initFilters();
 });
@@ -581,7 +645,7 @@ function renderAlerts(alerts) {
         <div style="color:var(--text-muted);font-size:0.78rem;margin-top:2px">Radius: ${a.affected_radius_km}km · ${new Date(a.issued_at).toLocaleString()}</div>
       </div>
       <div style="display:flex;gap:8px">
-        <button class="btn-resq" style="padding:6px 14px;font-size:0.82rem" onclick="notifyAll(${a.alert_id})">📣 Notify All</button>
+        <button type="button" data-notify class="btn-resq" style="padding:6px 14px;font-size:0.82rem" onclick="notifyAll(${a.alert_id})">Record in-app alerts</button>
         <button class="btn-resq-outline" style="padding:6px 14px;font-size:0.82rem" onclick="viewResponses(${a.alert_id})">View Responses</button>
       </div>
     </div>
@@ -589,30 +653,18 @@ function renderAlerts(alerts) {
 }
 
 async function notifyAll(alertId) {
-  try {
-    const data = await Api.put(`/alerts/${alertId}/notify`);
-    if (data && data.success) {
-      Toast.show(`Pings sent to ${data.pings_sent} responders in zone`, 'success');
-    } else {
-      Toast.show(data.message || 'Failed to send pings', 'danger');
-    }
-  } catch (e) {
-    Toast.show('Error connecting to notification service', 'danger');
-  }
+  await recordNotificationBatch(async () => [{ alert_id: alertId }]);
 }
 
 async function viewResponses(alertId) {
   try {
-    const data = await Api.get(`/alerts/${alertId}/responses`);
-    if (data && data.success) {
-      const responses = data.responses || [];
-      const summary = responses.map(p => `${p.user_name} (${p.status})`).join(' | ') || 'No responses yet';
-      Toast.show(summary, 'info', 6000);
-    } else {
-      Toast.show(data.message || 'Failed to load responses', 'danger');
-    }
-  } catch (e) {
-    Toast.show('Error loading responses', 'danger');
+    const data = await Api.notificationRequest(`/alerts/${alertId}/responses`);
+    if (!Array.isArray(data.responses)) throw new Error('Could not read recorded responses.');
+    const summary = data.responses.map(p => `${p.user_name} (${p.status === 'Sent' ? 'Awaiting response' : p.status})`).join(' | ')
+      || 'No in-app alert records or responses yet';
+    Toast.show(summary, 'info', 6000);
+  } catch (error) {
+    Toast.show(error.message || 'Could not load recorded responses.', 'danger');
   }
 }
 
@@ -767,27 +819,57 @@ renderAlerts = function (alerts) {
         <div><strong>Status:</strong> Active</div>
       </div>
       <div style="margin-top:12px;display:flex;gap:8px">
-        <button class="btn-resq" style="padding:6px 14px;font-size:0.82rem" onclick="notifyAll(${a.alert_id})">📣 Notify Responders</button>
+        <button type="button" data-notify class="btn-resq" style="padding:6px 14px;font-size:0.82rem" onclick="notifyAll(${a.alert_id})">Record in-app alerts</button>
       </div>
     </div>
   `).join('');
 };
 
-async function notifyAllResponders(type) {
+let notificationBatchInFlight = false;
+async function recordNotificationBatch(loadBatch) {
+  if (notificationBatchInFlight) return;
+  notificationBatchInFlight = true;
+  const buttons = () => document.querySelectorAll('[data-notify]');
+  buttons().forEach(button => { button.disabled = true; });
   try {
-    const alertsData = await Api.get('/alerts');
-    const alerts = alertsData?.alerts || [];
+    const alerts = await loadBatch();
+    if (!Array.isArray(alerts) || alerts.some(a => !Number.isInteger(a.alert_id) || a.alert_id <= 0)) {
+      throw new Error('Could not read current advisories. No batch was started.');
+    }
     if (!alerts.length) {
-      Toast.show('No active alerts to notify about', 'warning');
+      Toast.show('No current advisories. No in-app alerts were recorded.', 'info');
       return;
     }
-    let totalPings = 0;
-    for (const alert of alerts) {
-      const data = await Api.put(`/alerts/${alert.alert_id}/notify`);
-      totalPings += data?.pings_sent || 0;
+    let created = 0, volunteers = 0, ngos = 0, already = 0;
+    const failed = [];
+    for (let index = 0; index < alerts.length; index++) {
+      const alert = alerts[index];
+      try {
+        const data = await Api.notificationRequest(`/alerts/${alert.alert_id}/notify`, 'PUT');
+        const counts = [data.pings_created, data.by_role?.volunteer, data.by_role?.ngo, data.already_recorded];
+        if (counts.some(n => !Number.isInteger(n) || n < 0) || counts[1] + counts[2] !== counts[0]) {
+          throw new Error('The server did not confirm recorded counts.');
+        }
+        created += counts[0]; volunteers += counts[1]; ngos += counts[2]; already += counts[3];
+      } catch (error) {
+        failed.push(`#${alert.alert_id}: ${error.message || 'result unconfirmed'}`);
+        if ([401, 403, 422].includes(error.status)) {
+          failed.push(...alerts.slice(index + 1).map(a => `#${a.alert_id}: not attempted after access failure`));
+          break;
+        }
+      }
     }
-    Toast.show(`✅ ${totalPings} ${type === 'volunteer' ? 'volunteers' : 'NGOs'} notified successfully`, 'success');
-  } catch (e) {
-    Toast.show('Failed to send notifications', 'danger');
+    const summary = `${created} new in-app alert records (${volunteers} volunteer, ${ngos} NGO); ${already} already recorded. No external delivery or acknowledgement confirmed.`;
+    Toast.show(failed.length ? `${summary} ${failed.length} advisories failed or unconfirmed: ${failed.join('; ')}` : summary,
+      failed.length ? (created ? 'warning' : 'danger') : (created ? 'success' : 'info'), 8000);
+  } catch (error) {
+    Toast.show(error.message || 'Could not confirm notification results. Reload before retrying.', 'danger');
+  } finally {
+    notificationBatchInFlight = false;
+    buttons().forEach(button => { button.disabled = false; });
   }
+}
+
+async function notifyAllResponders() {
+  await recordNotificationBatch(async () => (await Api.notificationRequest('/alerts')).alerts);
 }

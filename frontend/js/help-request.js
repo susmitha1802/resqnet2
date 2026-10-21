@@ -8,7 +8,7 @@ let userLocation = null;
 let aiPreviewShown = false;
 let pickerMap = null;
 
-/* ── AI Priority Logic ── */
+/* ── Local rule-based priority preview; server computes final priority ── */
 function computeAIPriority(type, peopleStr) {
   let score = 0;
   const people = parseInt(peopleStr, 10) || 0;
@@ -26,7 +26,7 @@ function computeAIPriority(type, peopleStr) {
   return { level: 'Low', color: 'var(--success)', reason: 'Standard priority / Few people.' };
 }
 
-/* ── AI Priority Preview ── */
+/* ── Rule-based Priority Preview ── */
 function updateAIPreview() {
   const type = document.getElementById('request-type')?.value;
   const people = document.getElementById('people-count')?.value;
@@ -119,7 +119,7 @@ function initImageUpload() {
           <img src="${url}" style="max-width:200px;max-height:150px;border-radius:10px;border:1px solid var(--border-glass)">
           <button onclick="removeImage()" style="position:absolute;top:-8px;right:-8px;width:24px;height:24px;border-radius:50%;background:var(--danger);border:none;color:white;cursor:pointer">✕</button>
         </div>
-        <p style="color:var(--success);font-size:0.8rem;margin-top:8px">🤖 AI damage severity analysis will run on submission</p>
+        <p style="color:var(--text-muted);font-size:0.8rem;margin-top:8px">Any rule-based severity estimate is unvalidated and does not confirm damage.</p>
       `;
     }
     if (drop) drop.style.display = 'none';

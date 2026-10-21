@@ -70,6 +70,18 @@ test('linked SOS uses a plain Leaflet layer group safely and only centers once',
   assert.equal(s.map.views[0].point[0], 9.9312);
 });
 
+test('volunteer marker rendering does not interrupt a linked disaster report', async () => {
+  const s = setup('?report_id=2');
+  s.data({ success: true, requests: [request], reports: [report], volunteers: [
+    { volunteer_id: 3, user_name: '<Volunteer>', availability_status: 'available',
+      last_location_lat: 12.97, last_location_lng: 77.59 }
+  ] });
+  await s.init();
+  assert.equal(s.map.views[0].point[0], 12.9716);
+  assert.equal(s.markers.find(marker => marker.coords[0] === 12.9716).opened, true);
+  assert.match(s.markers.find(marker => marker.coords[0] === 12.97).popup, /&lt;Volunteer&gt;/);
+});
+
 test('a user location choice wins even if linked incident data is still loading', async () => {
   const s = setup('?report_id=2');
   s.data({ success: true, requests: [], reports: [report], volunteers: [] });
@@ -107,4 +119,18 @@ test('legacy demo alert is excluded defensively; real zone popup includes proven
   assert.match(s.circles[0].popup, /Status: Active alert/);
   assert.match(s.circles[0].popup, /not an official warning/);
   assert.match(s.context.ResQMap.riskZonePopup({ ...legacy, is_demo: true }), /DEMO \/ SAMPLE/);
+});
+
+test('NGO markers require valid coordinates, including zero, without a Hyderabad fallback', async () => {
+  const s = setup();
+  s.context.fetch = async () => ({ ok: true, json: async () => ({ locations: [
+    { name: 'Unknown', latitude: null, longitude: null },
+    { name: 'Invalid', latitude: 999, longitude: 77 },
+    { name: 'Wrong type', latitude: false, longitude: false },
+    { name: 'Valid origin', latitude: 0, longitude: 0 },
+    { name: 'Valid outside Hyderabad', latitude: 12.9716, longitude: 77.5946 }
+  ] }) });
+  await s.context.addNgoDepotMarkers(s.map);
+  assert.deepEqual(s.markers.map(marker => Array.from(marker.coords)), [[0, 0], [12.9716, 77.5946]]);
+  assert.match(s.markers[0].popup, /Valid origin/);
 });

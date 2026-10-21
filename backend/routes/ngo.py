@@ -9,6 +9,7 @@ PUT  /ngo/allocate    — allocate a resource to a help request
 from datetime import datetime, timezone
 from sqlalchemy import update
 from sqlalchemy.exc import SQLAlchemyError
+from input_validation import coordinates, positive_integer
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import get_jwt_identity
 
@@ -26,6 +27,22 @@ def _success(data=None, message='OK', status=200):
 
 def _error(message='Error', status=400):
     return jsonify({'success': False, 'message': message}), status
+
+
+@ngo_bp.route('/ngo/readiness', methods=['PUT'])
+@require_role('ngo')
+def update_ngo_readiness():
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict) or data.get('status') not in ('available', 'unavailable'):
+        return _error('status must be available or unavailable')
+    user = db.session.get(User, int(get_jwt_identity()))
+    try:
+        user.availability = data['status']
+        db.session.commit()
+    except SQLAlchemyError:
+        db.session.rollback()
+        return _error('Readiness could not be saved. Please retry.', 503)
+    return _success({'availability': user.availability}, 'NGO readiness updated')
 
 
 # ── GET /ngo/dashboard ─────────────────────────────────────────────────────────
@@ -124,7 +141,12 @@ def add_ngo_resource():
         description: Resource added
     """
     uid  = int(get_jwt_identity())
-    data = request.get_json(silent=True) or {}
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return _error('A JSON object is required')
+    if any(not isinstance(data.get(key, default), str) for key, default in
+           [('name', ''), ('category', 'General'), ('unit', 'units'), ('location', '')]):
+        return _error('Resource text fields must be strings')
 
     name     = data.get('name', '').strip()
     category = data.get('category', 'General').strip()
@@ -132,8 +154,14 @@ def add_ngo_resource():
     unit     = data.get('unit', 'units').strip()
     location = data.get('location', '').strip()
 
-    if not name or quantity <= 0:
-        return _error('name and quantity (>0) are required')
+    try:
+        quantity = positive_integer(quantity)
+    except ValueError:
+        return _error('quantity must be a positive integer')
+    if not name or not category or not unit:
+        return _error('name, category and unit are required')
+    if len(name) > 150 or len(category) > 50 or len(unit) > 30 or len(location) > 200:
+        return _error('Resource text field is too long')
 
     resource = ReliefResource(
         name     = name,
@@ -143,10 +171,55 @@ def add_ngo_resource():
         location = location,
         added_by = uid,
     )
-    db.session.add(resource)
-    db.session.commit()
+    try:
+        db.session.add(resource)
+        db.session.commit()
+    except SQLAlchemyError:
+        db.session.rollback()
+        return _error('Resource could not be saved. Please retry.', 503)
 
     return _success({'resource': resource.to_dict()}, 'Resource added to inventory', 201)
+
+
+@ngo_bp.route('/ngo/resources/<int:resource_id>', methods=['PUT'])
+@require_role('ngo')
+def update_ngo_resource(resource_id):
+    """Edit quantity/location of an owned, unallocated inventory row."""
+    uid = int(get_jwt_identity())
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict) or not data or set(data) - {'quantity', 'location'}:
+        return _error('Provide quantity and/or location only')
+    values = {}
+    if 'quantity' in data:
+        try:
+            values['quantity'] = positive_integer(data['quantity'])
+        except ValueError:
+            return _error('quantity must be a positive integer')
+    if 'location' in data:
+        if not isinstance(data['location'], str) or len(data['location'].strip()) > 200:
+            return _error('location must be a string of at most 200 characters')
+        values['location'] = data['location'].strip()
+    resource = db.session.get(ReliefResource, resource_id)
+    if resource is None:
+        return _error('Resource not found', 404)
+    if resource.added_by != uid:
+        return _error('Resource belongs to another NGO', 403)
+    if resource.allocated_to is not None:
+        return _error('Allocated resources cannot be edited', 409)
+    try:
+        changed = db.session.execute(update(ReliefResource).where(
+            ReliefResource.resource_id == resource_id,
+            ReliefResource.added_by == uid,
+            ReliefResource.allocated_to.is_(None)
+        ).values(**values)).rowcount
+        if changed != 1:
+            db.session.rollback()
+            return _error('Resource changed. Refresh inventory.', 409)
+        db.session.commit()
+    except SQLAlchemyError:
+        db.session.rollback()
+        return _error('Resource update could not be saved', 503)
+    return _success({'resource': resource.to_dict()}, 'Resource updated')
 
 
 # ── GET /ngo/requests ──────────────────────────────────────────────────────────
@@ -198,7 +271,7 @@ def get_ngo_locations():
     Public endpoint returning NGO organisation locations for map display.
     The 'location' field on NGO users may contain:
       - a "lat,lng" string  (e.g. "17.7231,83.3012") — parsed directly
-      - an org-name/address string — marker placed at Hyderabad default
+      - an org-name/address string — no marker without explicit valid coordinates
     ---
     tags:
       - NGO
@@ -210,17 +283,15 @@ def get_ngo_locations():
 
     locations = []
     for ngo in ngos:
-        lat, lng = 17.4401, 78.4487  # Hyderabad fallback
         loc_str = (ngo.location or '').strip()
 
-        # Try "lat,lng" format
-        if ',' in loc_str:
-            parts = loc_str.split(',', 1)
-            try:
-                lat = float(parts[0].strip())
-                lng = float(parts[1].strip())
-            except ValueError:
-                pass  # keep fallback
+        if ',' not in loc_str:
+            continue
+        parts = loc_str.split(',', 1)
+        try:
+            lat, lng = coordinates(parts[0].strip(), parts[1].strip(), form=True)
+        except ValueError:
+            continue
 
         locations.append({
             'name':      ngo.name,
@@ -257,12 +328,14 @@ def ngo_allocate_resource():
       404:
         description: Resource or request not found
     """
-    data        = request.get_json(silent=True) or {}
+    data        = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return _error('A JSON object is required')
     resource_id = data.get('resource_id')
     request_id  = data.get('request_id')
 
-    if not resource_id or not request_id:
-        return _error('resource_id and request_id are required')
+    if type(resource_id) is not int or resource_id <= 0 or type(request_id) is not int or request_id <= 0:
+        return _error('resource_id and request_id must be positive integers')
 
     resource = db.session.get(ReliefResource, resource_id)
     if not resource or resource.added_by != int(get_jwt_identity()):

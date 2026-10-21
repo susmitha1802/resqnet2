@@ -132,14 +132,16 @@ window.ResQMap = {
 
   /**
    * Forward geocoding — address string → { lat, lng, displayName }
-   * Rate-limited to 1 req/sec by OSM policy.
+   * Backend enforces the shared application limit and caches responses.
    */
   async geocode(query) {
     if (!query || query.trim().length < 3) return null;
     try {
-      const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=5&countrycodes=in`;
-      const res = await fetch(url, { headers: { 'Accept-Language': 'en' } });
-      const data = await res.json();
+      const url = `${Api.BASE}/geocode?kind=search&q=${encodeURIComponent(query)}`;
+      const res = await fetch(url);
+      if (!res.ok) return [];
+      const payload = await res.json();
+      const data = payload.result || [];
       return data.map(r => ({
         lat: parseFloat(r.lat),
         lng: parseFloat(r.lon),
@@ -156,9 +158,9 @@ window.ResQMap = {
    */
   async reverseGeocode(lat, lng) {
     try {
-      const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`;
-      const res = await fetch(url, { headers: { 'Accept-Language': 'en' } });
-      const data = await res.json();
+      const url = `${Api.BASE}/geocode?kind=reverse&lat=${lat}&lon=${lng}`;
+      const res = await fetch(url);
+      const data = (await res.json()).result;
       if (data?.display_name) {
         // Return a concise 3-part address
         return data.display_name.split(',').slice(0, 3).join(', ');
@@ -208,20 +210,16 @@ window.ResQMap = {
 
   /**
    * Attach a search input (by element ID) to the map.
-   * Debounced — fires 600ms after last keystroke.
+   * Search only on explicit Enter/button action; no provider autocomplete.
    */
   attachSearchBar(map, inputId, resultsId, onSelect) {
     const input = document.getElementById(inputId);
     const results = document.getElementById(resultsId);
     if (!input || !results) return;
 
-    let debounce;
-    input.addEventListener('input', () => {
-      clearTimeout(debounce);
+    const search = async () => {
       const q = input.value.trim();
       if (q.length < 3) { results.style.display = 'none'; return; }
-
-      debounce = setTimeout(async () => {
         const hits = await ResQMap.geocode(q);
         if (!hits || !hits.length) { results.style.display = 'none'; return; }
 
@@ -230,7 +228,7 @@ window.ResQMap = {
             padding:10px 14px;cursor:pointer;border-bottom:1px solid rgba(255,255,255,0.05);
             font-size:0.82rem;color:#e5e7eb;transition:background 0.15s;
           " onmouseover="this.style.background='rgba(255,75,43,0.12)'"
-             onmouseout="this.style.background=''">${h.shortName}</div>
+             onmouseout="this.style.background=''">${ResQMap.escapeHtml(h.shortName)}</div>
         `).join('');
 
         results.style.display = 'block';
@@ -244,8 +242,10 @@ window.ResQMap = {
             if (onSelect) onSelect(h.lat, h.lng, h.shortName);
           });
         });
-      }, 600);
-    });
+    };
+    input.addEventListener('input', () => { results.style.display = 'none'; });
+    input.addEventListener('keydown', event => { if (event.key === 'Enter') { event.preventDefault(); search(); } });
+    document.getElementById(`${inputId}-button`)?.addEventListener('click', event => { event.preventDefault(); search(); });
 
     // Close dropdown on outside click
     document.addEventListener('click', (e) => {
@@ -378,7 +378,8 @@ async function addNgoDepotMarkers(mapInstance, targetGroup = null) {
     if (!data.locations) return;
 
     data.locations.forEach(ngo => {
-      if (!ngo.latitude || !ngo.longitude) return;
+      if (typeof ngo.latitude !== 'number' || typeof ngo.longitude !== 'number'
+          || !ResQMap.hasCoordinates(ngo.latitude, ngo.longitude)) return;
 
       const icon = L.divIcon({
         className: '',
@@ -392,8 +393,8 @@ async function addNgoDepotMarkers(mapInstance, targetGroup = null) {
         iconSize: [28, 28],
         iconAnchor: [14, 14]
       });
-      L.marker([parseFloat(ngo.latitude), parseFloat(ngo.longitude)], { icon })
-        .bindPopup(ResQMap.popupHtml(`<b>🏢 ${ResQMap.escapeHTML(ngo.name)}</b><br>Relief Depot & Organization HQ`))
+      L.marker([Number(ngo.latitude), Number(ngo.longitude)], { icon })
+        .bindPopup(ResQMap.popupHtml(`<b>🏢 ${ResQMap.escapeHtml(ngo.name)}</b><br>Relief Depot & Organization HQ`))
         .addTo(targetGroup || mapInstance);
     });
   } catch (err) {
@@ -415,11 +416,11 @@ ResQMap.reverseGeocode = async function (lat, lng) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 5000);
   try {
-    const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}`, {
+    const res = await fetch(`${Api.BASE}/geocode?kind=reverse&lat=${lat}&lon=${lng}`, {
       signal: controller.signal, headers: { Accept: 'application/json' }, redirect: 'error'
     });
     if (!res.ok) throw new Error('Nominatim error');
-    const data = await res.json();
+    const data = (await res.json()).result || {};
     const address = data.address || {};
     const name = typeof data.display_name === 'string' && data.display_name.trim()
       ? data.display_name.split(',').slice(0, 3).join(', ')
@@ -631,10 +632,10 @@ ResQMap.setupOperationalMap = async function (containerId, role = 'admin') {
     // Plot Volunteers (if allowed)
     if (role !== 'reporter') {
       (data.volunteers || []).forEach(v => {
-        if (!v.last_location_lat || !v.last_location_lng) return;
+        if (!ResQMap.hasCoordinates(v.last_location_lat, v.last_location_lng)) return;
         const icon = ResQMap.circleIcon('#3B82F6', 16);
         L.marker([v.last_location_lat, v.last_location_lng], { icon })
-          .bindPopup(`<b>Volunteer ${ResQMap.escapeHTML(v.user_name || '')}</b><br>Status: ${ResQMap.escapeHTML(v.availability_status)}`)
+          .bindPopup(`<b>Volunteer ${ResQMap.escapeHtml(v.user_name || '')}</b><br>Status: ${ResQMap.escapeHtml(v.availability_status)}`)
           .addTo(layers.volunteers);
       });
     }
