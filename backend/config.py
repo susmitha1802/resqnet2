@@ -52,6 +52,7 @@ class Config:
     RATELIMIT_STORAGE_URI = os.getenv('RATELIMIT_STORAGE_URI', 'memory://')
     RATELIMIT_ENABLED = True
     TRUSTED_PROXY_HOPS = int(os.getenv('TRUSTED_PROXY_HOPS', '0'))
+    PROXY_DIAGNOSTIC_ENABLED = os.getenv('PROXY_DIAGNOSTIC_ENABLED', 'False') == 'True'
 
     # Maps & Geocoding (Currently Leaflet + Nominatim are free, but keys can be provided for Mapbox/LocationIQ)
     MAP_PROVIDER = os.getenv('MAP_PROVIDER', 'leaflet')

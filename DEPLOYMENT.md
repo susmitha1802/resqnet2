@@ -66,6 +66,45 @@ inputs. Do not apply an automatic migration to existing data.
    Redis. Do not disable these checks to make deployment pass. A healthy
    `/health` alone does not prove database/storage/Redis durability.
 
+### Temporary Render proxy check (before public access)
+
+1. After reviewing and deploying this code to a restricted preview, set
+   `TRUSTED_PROXY_HOPS=1` and `PROXY_DIAGNOSTIC_ENABLED=True` in Render's private
+   Environment controls and redeploy. The diagnostic is absent by default and,
+   when enabled, requires an existing admin JWT. It returns only a keyed
+   comparison code for the address used by rate limiting; it never returns or
+   logs IPs or forwarded headers. Keep the preview restricted to test users.
+2. Sign in as the same test admin on the Netlify admin dashboard from network A.
+   In that page's browser console, run the snippet below. Repeat on network B
+   (for example, a phone using mobile data rather than the same Wi-Fi). Check
+   DevTools Network to confirm the second request actually carried the spoofed
+   `X-Forwarded-For` header; if the browser removes it, use a private HTTP client
+   with the same admin JWT instead. Never paste the JWT or full request headers
+   into logs, screenshots, tickets or chat.
+
+   ```js
+   async function proxyCode(spoof = false) {
+     const response = await fetch(`${Api.BASE}/admin/proxy-diagnostic`, {
+       headers: {
+         Authorization: `Bearer ${Api.getToken()}`,
+         ...(spoof ? { 'X-Forwarded-For': '192.0.2.123' } : {})
+       }, cache: 'no-store'
+     });
+     if (!response.ok) throw new Error(`Diagnostic HTTP ${response.status}`);
+     return (await response.json()).client_code;
+   }
+   console.log(await proxyCode(), await proxyCode(true));
+   ```
+
+   The two codes on each network must match; the code from network A must
+   differ from network B. If either condition fails, do not open public access
+   or increase the hop count by guesswork: inspect the actual Render forwarding
+   chain privately and confirm the trusted rightmost value with Render support.
+   This comparison tests the address used by Flask-Limiter, not network uptime.
+3. Set `PROXY_DIAGNOSTIC_ENABLED=False` (or remove it) and redeploy. Confirm
+   `/admin/proxy-diagnostic` now returns 404. Keep the verified hop count and
+   normal authentication, rate limiting and production checks enabled.
+
 ## 3. Netlify dashboard
 
 1. Connect the same reviewed branch. Use the repository's `netlify.toml`:

@@ -9,6 +9,8 @@ Architecture:
     routes/admin.py         → admin_bp         (/admin/*)
 """
 import os
+import hashlib
+import hmac
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 from flask_jwt_extended import jwt_required, get_jwt_identity, verify_jwt_in_request
@@ -416,6 +418,22 @@ def create_app(config_class=Config) -> Flask:
     app.register_blueprint(flood_bp)
     from routes.geocode import geocode_bp
     app.register_blueprint(geocode_bp)
+
+    if app.config.get('PROXY_DIAGNOSTIC_ENABLED'):
+        from routes.middleware import require_role
+
+        @app.get('/admin/proxy-diagnostic')
+        @require_role('admin')
+        def proxy_diagnostic():
+            # A stable comparison code, never a client IP or forwarded header.
+            address = (request.remote_addr or '').encode('utf-8')
+            key = app.config['SECRET_KEY'].encode('utf-8')
+            code = hmac.new(key, b'resqnet-proxy-diagnostic\0' + address,
+                            hashlib.sha256).hexdigest()[:24]
+            response = jsonify(success=True, client_code=code,
+                               trusted_proxy_hops=app.config['TRUSTED_PROXY_HOPS'])
+            response.headers['Cache-Control'] = 'no-store'
+            return response
 
     from rate_limits import init_rate_limiting
     init_rate_limiting(app)
