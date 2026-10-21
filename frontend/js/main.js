@@ -400,3 +400,11 @@ function clearNotifications() { }
 window.toggleNotifDropdown = toggleNotifDropdown;
 window.closeNotifDropdown = closeNotifDropdown;
 window.clearNotifications = clearNotifications;
+
+// The shared script is present on every page; load the optional guidance widget once.
+if (document.head && document.createElement) {
+  const chatbotScript = document.createElement('script');
+  chatbotScript.src = 'js/chatbot.js';
+  chatbotScript.defer = true;
+  document.head.appendChild(chatbotScript);
+}

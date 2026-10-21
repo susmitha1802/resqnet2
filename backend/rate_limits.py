@@ -41,6 +41,7 @@ def init_rate_limiting(app):
         ('alerts.live_weather', '30 per minute', ['GET']),
         ('alerts.fetch_owm_alerts', '10 per minute', ['POST']),
         ('geocode.geocode', '1 per second', ['GET']),
+        ('chat.chat', '6 per minute', ['POST']),
     ]:
         view = app.view_functions.get(endpoint)
         if view is None:

@@ -84,6 +84,17 @@ The homepage uses the existing backend `/weather/live` proxy. Provide a rotated
 HTML/JavaScript. See [LOCAL_FLOOD.md](LOCAL_FLOOD.md) for opt-in event API setup.
 No satellite data or processing environment is included here.
 
+The optional guidance chat uses `POST /api/chat`. To try it locally, put a private
+`GROQ_API_KEY` in ignored `backend/.env` and optionally select a currently supported
+chat model with `GROQ_MODEL`; restart Flask, then open any frontend page and use
+the floating **ResQNet guidance** button. The default model is
+`openai/gpt-oss-20b`. Leave the key blank to receive a clear unavailable response.
+The browser never receives the key, chat history is held only in page memory,
+and the assistant cannot inspect accounts or submit an SOS. For quota-free
+verification, run `unittest discover -s backend/tests -p test_chat.py` and
+`node --test frontend/tests/chatbot.test.cjs`; both mock Groq. A live question
+uses Groq quota and is not part of automated tests.
+
 Map address searches run only after Enter or Search. The backend `/geocode` proxy
 shares a one-request-per-second limit and caches lookups, using the existing Redis
 rate store across production workers. `NOMINATIM_BASE_URL` can switch providers;

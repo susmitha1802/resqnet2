@@ -125,22 +125,29 @@ def live_weather():
         with urllib.request.urlopen(req, timeout=8) as response:
             cur_resp = json.loads(response.read().decode('utf-8'))
         
-        fc_url = f'https://api.openweathermap.org/data/2.5/forecast?lat={lat}&lon={lng}&appid={owm_key}&units=metric'
-        req_fc = urllib.request.Request(fc_url, headers={'User-Agent': 'Mozilla/5.0'})
-        with urllib.request.urlopen(req_fc, timeout=8) as response_fc:
-            fc_data = json.loads(response_fc.read().decode('utf-8'))
-        
-        daily = {}
-        for item in fc_data.get('list', []):
-            dt_txt = item.get('dt_txt', '').split(' ')[0]
-            if dt_txt not in daily:
-                daily[dt_txt] = item
-        forecast_list = list(daily.values())[:5]
+        # A forecast outage must not discard a valid current observation.
+        forecast_list = []
+        forecast_available = False
+        try:
+            fc_url = f'https://api.openweathermap.org/data/2.5/forecast?lat={lat}&lon={lng}&appid={owm_key}&units=metric'
+            req_fc = urllib.request.Request(fc_url, headers={'User-Agent': 'Mozilla/5.0'})
+            with urllib.request.urlopen(req_fc, timeout=8) as response_fc:
+                fc_data = json.loads(response_fc.read().decode('utf-8'))
+            daily = {}
+            for item in fc_data.get('list', []):
+                dt_txt = item.get('dt_txt', '').split(' ')[0]
+                if dt_txt not in daily:
+                    daily[dt_txt] = item
+            forecast_list = list(daily.values())[:5]
+            forecast_available = True
+        except Exception:
+            pass
 
         return jsonify({
             'success': True, 
             'current': cur_resp,
-            'forecast': forecast_list
+            'forecast': forecast_list,
+            'forecast_available': forecast_available
         }), 200
     except Exception:
         return jsonify({'success': False, 'message': 'Weather provider unavailable. Please retry.'}), 502

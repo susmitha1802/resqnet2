@@ -397,7 +397,7 @@ def create_app(config_class=Config) -> Flask:
         response.headers['X-Content-Type-Options'] = 'nosniff'
         response.headers['Referrer-Policy'] = 'no-referrer'
         if (request.headers.get('Authorization') or request.path.startswith('/admin/')
-                or request.path in {'/login', '/register', '/profile'}):
+                or request.path in {'/login', '/register', '/profile', '/api/chat'}):
             response.headers['Cache-Control'] = 'private, no-store'
         return response
 
@@ -418,6 +418,8 @@ def create_app(config_class=Config) -> Flask:
     app.register_blueprint(flood_bp)
     from routes.geocode import geocode_bp
     app.register_blueprint(geocode_bp)
+    from routes.chat import chat_bp
+    app.register_blueprint(chat_bp)
 
     if app.config.get('PROXY_DIAGNOSTIC_ENABLED'):
         from routes.middleware import require_role
@@ -538,6 +540,7 @@ def create_app(config_class=Config) -> Flask:
         
         # Active Volunteers = currently available
         active_vols = Volunteer.query.filter_by(availability_status='available').count()
+        total_volunteers = Volunteer.query.count()
         
         # Completed = total resolved requests
         completed_reqs = HelpRequest.query.filter_by(status='Completed').count()
@@ -550,6 +553,7 @@ def create_app(config_class=Config) -> Flask:
                 'total_requests': total_requests,
                 'active_requests': active_reqs,
                 'active_volunteers': active_vols,
+                'total_volunteers': total_volunteers,
                 'completed': completed_reqs
             }
         })

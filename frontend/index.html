@@ -355,18 +355,18 @@
         <div>
           <div class="resq-card" style="border:1px solid rgba(255,45,85,0.15);">
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
-              <div style="font-weight:700;font-size:0.875rem;">🔴 Live Emergency Feed</div>
-              <div class="badge-live">LIVE</div>
+              <div style="font-weight:700;font-size:0.875rem;">Emergency Activity</div>
+              <div class="badge-live">APP DATA</div>
             </div>
             <div id="live-feed-container" style="max-height:300px;overflow-y:auto;">
               <div style="text-align:center;padding:40px;color:var(--text-muted);">
                 <div style="font-size:2rem;margin-bottom:12px;">📡</div>
-                Connect to backend to see live data
+                Loading recorded activity…
               </div>
             </div>
             <div
               style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border-subtle);display:flex;justify-content:space-between;align-items:center;">
-              <div style="font-size:0.75rem;color:var(--text-muted);">Real-time situational awareness</div>
+              <div style="font-size:0.75rem;color:var(--text-muted);">Recorded SOS and unverified community reports</div>
               <a href="map.html" class="btn btn-outline btn-sm">Interactive Map →</a>
             </div>
           </div>
@@ -390,6 +390,29 @@
     </div>
   </div>
 
+  <section class="section-sm" aria-labelledby="weather-heading">
+    <div class="container">
+      <div class="weather-overview resq-card">
+        <div class="weather-overview-head">
+          <div>
+            <div class="hero-eyebrow mb-12">Provider observation</div>
+            <h2 id="weather-heading">Reference Weather</h2>
+            <p id="weather-location">Central India reference location</p>
+          </div>
+          <span class="weather-provider">OpenWeather · current observation</span>
+        </div>
+        <p id="weather-state" class="weather-state" role="status" aria-live="polite">Loading weather…</p>
+        <div class="weather-overview-grid">
+          <div class="weather-main-reading"><strong id="weather-temperature">—</strong><span id="weather-conditions">Conditions unavailable</span></div>
+          <div class="weather-metric"><span>Rainfall</span><strong id="weather-rainfall">—</strong><small id="weather-rainfall-period">Provider measurement</small></div>
+          <div class="weather-metric"><span>Humidity</span><strong id="weather-humidity">—</strong><small>Relative humidity</small></div>
+          <div class="weather-metric"><span>Wind</span><strong id="weather-wind">—</strong><small>Speed</small></div>
+        </div>
+        <p class="weather-caveat">This is weather for the reference location, not your device location or an official disaster warning.</p>
+      </div>
+    </div>
+  </section>
+
   <!-- 3. PREPAREDNESS -->
   <section class="section" id="preparedness" style="background:var(--bg-secondary);">
     <div class="container">
@@ -398,25 +421,23 @@
         <h2 class="section-title">Preparedness Coordination</h2>
         <p
           style="color:var(--text-secondary);margin-top:12px;font-size:1rem;max-width:560px;margin-left:auto;margin-right:auto;">
-          Don't wait for disaster to strike. ResQNet enables communities to prepare ahead of time with live weather
-          intelligence and alert coordination.
+          ResQNet shows provider weather observations when configured and supports in-app preparedness coordination.
         </p>
       </div>
       <div class="grid-3">
         <div class="feature-card">
           <div class="feature-icon" style="background:rgba(245,158,11,0.1);color:var(--accent-amber);">⚠️</div>
           <h5>Early Warnings</h5>
-          <p style="color:var(--text-secondary);font-size:0.875rem;line-height:1.7;margin-top:8px;flex:1;">Automated
-            weather alerts from OpenWeatherMap instantly notify volunteers and NGOs in at-risk zones before the crisis
-            escalates.</p>
+          <p style="color:var(--text-secondary);font-size:0.875rem;line-height:1.7;margin-top:8px;flex:1;">Admins can
+            create advisories and record in-app preparedness pings for volunteers and NGOs. These are not official
+            warnings or external message delivery.</p>
           <a href="auth.html" class="btn-resq-outline" style="align-self:flex-start;margin-top:16px;">Learn More</a>
         </div>
         <div class="feature-card">
           <div class="feature-icon" style="background:rgba(0,180,255,0.1);color:var(--accent-blue);">📦</div>
           <h5>Pre-Disaster Allocation</h5>
-          <p style="color:var(--text-secondary);font-size:0.875rem;line-height:1.7;margin-top:8px;flex:1;">NGOs
-            preemptively stage and allocate critical resources — water, medicine, and shelters — based on predicted
-            impact zones.</p>
+          <p style="color:var(--text-secondary);font-size:0.875rem;line-height:1.7;margin-top:8px;flex:1;">NGOs can
+            record available supplies and allocate their own resources to active SOS requests.</p>
           <a href="auth.html" class="btn-resq-outline" style="align-self:flex-start;margin-top:16px;">Learn More</a>
         </div>
         <div class="feature-card">
@@ -516,20 +537,24 @@
           style="color:var(--text-secondary);margin-top:12px;font-size:1rem;max-width:460px;margin-left:auto;margin-right:auto;">
           Live ecosystem data powering response coordination.</p>
       </div>
-      <div class="grid-3 text-center">
-        <div class="resq-card" style="padding:40px;">
+      <p id="stats-message" class="stats-message" role="status" aria-live="polite">Loading recorded counts…</p>
+      <div class="home-stats-grid">
+        <div class="home-stat-card resq-card">
+          <span class="home-stat-icon home-stat-icon-red" aria-hidden="true">◎</span>
           <div class="stat-hl-val gradient-text" id="hero-stat-requests">—</div>
-          <div style="color:var(--text-secondary);font-size:0.875rem;margin-top:8px;">Active Emergency Incidents</div>
+          <div class="home-stat-label">Active SOS Requests</div>
         </div>
-        <div class="resq-card" style="padding:40px;">
+        <div class="home-stat-card resq-card">
+          <span class="home-stat-icon home-stat-icon-blue" aria-hidden="true">♙</span>
           <div class="stat-hl-val gradient-text-blue" id="hero-stat-volunteers">—</div>
-          <div style="color:var(--text-secondary);font-size:0.875rem;margin-top:8px;">Available Volunteers</div>
+          <div class="home-stat-label">Available Volunteers</div>
         </div>
-        <div class="resq-card" style="padding:40px;">
+        <div class="home-stat-card resq-card">
+          <span class="home-stat-icon home-stat-icon-green" aria-hidden="true">✓</span>
           <div class="stat-hl-val"
             style="background:var(--grad-success);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;"
             id="hero-stat-completed">—</div>
-          <div style="color:var(--text-secondary);font-size:0.875rem;margin-top:8px;">Completed SOS Requests</div>
+          <div class="home-stat-label">Completed SOS Requests</div>
         </div>
       </div>
     </div>
@@ -742,9 +767,15 @@
       if (!el) return;
       try {
         const data = await Api.get('/map/data');
-        const requests = (data.requests || []).slice(0, 7);
+        if (!data?.success || !Array.isArray(data.requests)) throw new Error('Activity unavailable');
+        const requests = data.requests.slice(0, 7);
         if (!requests.length) {
-          el.innerHTML = '<div style="text-align:center;padding:30px;color:var(--text-muted);">Incident details are limited in the public view. Sign in for your authorized view.</div>';
+          const count = data.total_active;
+          const message = Number.isInteger(count) && count > 0
+            ? `${count} active SOS or community report records are listed. Sign in for your authorized map view.`
+            : count === 0 ? 'No active SOS or community report records are currently listed.'
+              : 'Activity counts are unavailable right now.';
+          el.textContent = message;
           return;
         }
         el.innerHTML = requests.map(r => {
@@ -760,7 +791,7 @@
         </div>`;
         }).join('');
       } catch (e) {
-        el.innerHTML = '<div style="text-align:center;padding:30px;color:var(--text-muted);">📡 Connect to backend to see live data</div>';
+        el.textContent = 'Emergency activity is unavailable. Please retry later.';
       }
     }
 
@@ -769,13 +800,22 @@
         const data = await Api.get('/public/stats');
         if (!data?.success || !data.stats) throw new Error('Statistics unavailable');
         const stats = data.stats;
+        const counts = [stats.active_requests, stats.active_volunteers, stats.completed];
+        if (!counts.every(value => Number.isSafeInteger(value) && value >= 0)) throw new Error('Invalid statistics');
         const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
         set('hero-stat-requests', stats.active_requests);
         set('hero-stat-volunteers', stats.active_volunteers);
         set('hero-stat-completed', stats.completed);
         set('status-incidents', stats.active_requests);
         set('status-volunteers', stats.active_volunteers);
-      } catch (e) { ['hero-stat-requests', 'hero-stat-volunteers', 'hero-stat-completed', 'status-incidents', 'status-volunteers'].forEach(id => { const el = document.getElementById(id); if (el) el.textContent = 'Unavailable'; }); }
+        set('stats-message', stats.total_requests === 0 && stats.total_volunteers === 0
+          ? 'No SOS requests or volunteer registrations have been recorded yet.'
+          : 'Counts reflect database records, not live dispatch activity.');
+      } catch (e) {
+        ['hero-stat-requests', 'hero-stat-volunteers', 'hero-stat-completed', 'status-incidents', 'status-volunteers'].forEach(id => { const el = document.getElementById(id); if (el) el.textContent = 'Unavailable'; });
+        const message = document.getElementById('stats-message');
+        if (message) message.textContent = 'Recorded counts are unavailable. Please retry later.';
+      }
 
       try {
         const aData = await Api.get('/alerts');
@@ -786,22 +826,68 @@
         set('status-risk', alerts.filter(a => a.severity === 'Warning' || a.severity === 'Emergency').length);
       } catch (e) { for (const id of ['status-alerts', 'status-risk']) { const el = document.getElementById(id); if (el) el.textContent = 'Unavailable'; } }
 
+    }
+
+    async function loadWeather() {
+      const set = (id, value) => { const el = document.getElementById(id); if (el) el.textContent = value; };
+      for (const id of ['weather-temperature', 'weather-rainfall', 'weather-humidity', 'weather-wind']) set(id, '—');
+      set('weather-conditions', 'Conditions unavailable');
+      set('weather-rainfall-period', 'Provider measurement');
+      set('weather-location', 'Central India reference location');
+      set('weather-state', 'Loading weather…');
+      set('status-weather', 'Loading...');
       try {
         const weather = await Api.get('/weather/live');
         if (!weather?.success) {
-          const el = document.getElementById('status-weather');
-          if (el) el.textContent = 'Unavailable';
+          const unconfigured = weather?.message === 'Weather service is not configured.';
+          const providerError = weather?.message === 'Weather provider unavailable. Please retry.';
+          set('status-weather', unconfigured ? 'Not configured' : providerError ? 'Provider error' : 'Unavailable');
+          set('weather-state', unconfigured ? 'Weather is not configured for this site.'
+            : providerError ? 'Weather provider returned an error. Please retry later.'
+              : 'Weather is unavailable. Please retry later.');
           return;
         }
         const w = weather.current;
-        const el = document.getElementById('status-weather');
-        if (el) el.textContent = `${Math.round(w.main.temp)}°C, ${w.weather[0].main}`;
-      } catch (e) { const el = document.getElementById('status-weather'); if (el) el.textContent = 'Unavailable'; }
+        const temperature = w?.main?.temp;
+        const condition = w?.weather?.[0]?.description || w?.weather?.[0]?.main;
+        if (typeof temperature !== 'number' || !Number.isFinite(temperature)
+            || typeof condition !== 'string' || !condition.trim()) throw new Error('Incomplete weather observation');
+        const mainCondition = w.weather[0].main || condition;
+        set('status-weather', `${Math.round(temperature)}°C, ${mainCondition}`);
+        set('weather-temperature', `${Math.round(temperature)}°C`);
+        set('weather-conditions', condition);
+        const name = typeof w.name === 'string' ? w.name.trim() : '';
+        const country = typeof w.sys?.country === 'string' ? w.sys.country.trim() : '';
+        if (name) set('weather-location', `Reference location · ${name}${country ? ', ' + country : ''}`);
+        const humidity = w.main.humidity;
+        if (typeof humidity === 'number' && Number.isFinite(humidity) && humidity >= 0 && humidity <= 100)
+          set('weather-humidity', `${Math.round(humidity)}%`);
+        const wind = w.wind?.speed;
+        if (typeof wind === 'number' && Number.isFinite(wind) && wind >= 0)
+          set('weather-wind', `${wind.toFixed(1)} m/s`);
+        const rainHour = w.rain?.['1h'];
+        const rainThreeHours = w.rain?.['3h'];
+        const rain = typeof rainHour === 'number' ? rainHour : rainThreeHours;
+        if (typeof rain === 'number' && Number.isFinite(rain) && rain >= 0) {
+          set('weather-rainfall', `${rain.toFixed(1)} mm`);
+          set('weather-rainfall-period', typeof rainHour === 'number' ? 'Past hour' : 'Past three hours');
+        } else {
+          set('weather-rainfall', 'Not reported');
+        }
+        set('weather-state', 'Current provider observation. Rainfall appears only when reported.');
+      } catch (e) {
+        for (const id of ['weather-temperature', 'weather-rainfall', 'weather-humidity', 'weather-wind']) set(id, '—');
+        set('weather-conditions', 'Conditions unavailable');
+        set('weather-location', 'Central India reference location');
+        set('status-weather', 'Unavailable');
+        set('weather-state', 'Weather is unavailable. Please retry later.');
+      }
     }
 
     document.addEventListener('DOMContentLoaded', () => {
       loadLiveFeed();
       loadStats();
+      loadWeather();
       setInterval(loadLiveFeed, 15000);
     });
   </script>

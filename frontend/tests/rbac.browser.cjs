@@ -65,6 +65,11 @@ async function main() {
           let payload = apiPath === '/profile' ? {success: true, user}
             : apiPath === '/volunteer/tasks' ? {success:true,tasks:[{task_id:1,request_id:1,status:'Proof Submitted',verification_status:'Pending'}]}
             : {success:true,requests:[],reports:[],alerts:[],pings:[],verifications:[],resources:[],locations:[],zones:[],volunteers:[],stats:{}};
+          if (apiPath === '/public/stats') payload = {success:true,stats:{total_requests:4,
+            active_requests:2,active_volunteers:1,total_volunteers:2,completed:1}};
+          if (apiPath === '/weather/live') payload = {success:true,current:{name:'Provider Place',
+            sys:{country:'IN'},main:{temp:26,humidity:70},wind:{speed:3.5},
+            rain:{'1h':0.6},weather:[{main:'Clouds',description:'scattered clouds'}]}};
           const pingId = currentRole === 'ngo' ? 8 : 7;
           if (apiPath === '/preparedness/my-pings' && currentRole in pingStates) {
             payload.pings = [{ping_id:pingId,status:pingStates[currentRole],alert_type:'Storm',severity:'Watch',description:'Unverified fixture advisory'}];
@@ -113,6 +118,31 @@ async function main() {
       for (let n=0;n<100;n++) { if (await evaluate(expression)) return true; await delay(50); }
       return false;
     };
+    await send('Page.navigate',{url:origin+'/index.html'});
+    assert.ok(await waitFor(`document.getElementById('hero-stat-requests')?.textContent === '2'`));
+    assert.ok(await waitFor(`document.getElementById('weather-rainfall')?.textContent === '0.6 mm'`),
+      'weather observation did not render');
+    assert.ok(await waitFor(`!!document.getElementById('resq-chat-toggle')`));
+    await evaluate(`document.getElementById('resq-chat-toggle').click()`);
+    for (const width of [390, 1280]) {
+      await send('Emulation.setDeviceMetricsOverride', {width,height:900,deviceScaleFactor:1,mobile:false});
+      await delay(80);
+      const layout = await evaluate(`(() => {
+        const bounds = selector => { const r=document.querySelector(selector).getBoundingClientRect();
+          return {left:r.left,right:r.right,top:r.top,width:r.width}; };
+        return {viewport:innerWidth,chat:bounds('#resq-chat-panel'),
+          weather:bounds('.weather-overview'),stats:bounds('.home-stats-grid'),
+          first:bounds('.home-stat-card:first-child'),second:bounds('.home-stat-card:nth-child(2)')};
+      })()`);
+      for (const name of ['chat','weather','stats']) {
+        assert.ok(layout[name].left >= -1 && layout[name].right <= width+1,
+          name+' must fit '+width+'px viewport: '+JSON.stringify(layout));
+      }
+      assert.equal(width===390, layout.second.top > layout.first.top,
+        'statistics cards should stack only on the phone viewport');
+    }
+    await evaluate(`document.querySelector('.resq-chat-close').click()`);
+    console.log('PASS browser: homepage weather, database counts and chat fit phone and desktop');
     for (const [role, page, label] of [['reporter','user','Disaster Reporter'],['volunteer','volunteer','Volunteer'],['ngo','ngo','NGO / Organization'],['admin','admin','Administrator']]) {
       currentRole=role; console.log('Checking browser role: '+role);
       await send('Page.navigate',{url:`${origin}/${page}-dashboard.html`});
@@ -123,6 +153,14 @@ async function main() {
         await delay(50);
       }
       assert.equal(verified,true,role+' dashboard did not verify its server role');
+      assert.ok(await waitFor(`!!document.getElementById('resq-chat-toggle')`), 'Shared guidance widget did not load');
+      if (role === 'reporter') {
+        await evaluate(`document.getElementById('resq-chat-toggle').click()`);
+        assert.equal(await evaluate(`document.getElementById('resq-chat-panel').hidden`), false);
+        assert.match(await evaluate(`document.querySelector('.resq-chat-notice').textContent`), /SOS is submitted only after/);
+        await evaluate(`document.querySelector('.resq-chat-header button').click()`);
+        assert.equal(await evaluate(`document.getElementById('resq-chat-panel').hidden`), true);
+      }
       for (const width of [390, 768, 1280]) {
         await send('Emulation.setDeviceMetricsOverride', {width,height:900,deviceScaleFactor:1,mobile:false});
         const layout = await evaluate(`(() => {

@@ -53,6 +53,8 @@ class Config:
     RATELIMIT_ENABLED = True
     TRUSTED_PROXY_HOPS = int(os.getenv('TRUSTED_PROXY_HOPS', '0'))
     PROXY_DIAGNOSTIC_ENABLED = os.getenv('PROXY_DIAGNOSTIC_ENABLED', 'False') == 'True'
+    GROQ_API_KEY = os.getenv('GROQ_API_KEY', '')
+    GROQ_MODEL = os.getenv('GROQ_MODEL', 'openai/gpt-oss-20b')
 
     # Maps & Geocoding (Currently Leaflet + Nominatim are free, but keys can be provided for Mapbox/LocationIQ)
     MAP_PROVIDER = os.getenv('MAP_PROVIDER', 'leaflet')
