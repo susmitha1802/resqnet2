@@ -1,7 +1,7 @@
 import math
 import re
 from datetime import datetime, timezone, timedelta
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, current_app, jsonify, request
 from sqlalchemy import or_
 from models import WeatherAlert, DisasterReport
 from map_provenance import demo_alert, demo_incident
@@ -79,7 +79,7 @@ def get_risk_zones():
     zones = []
     for alert in active_alerts:
         is_demo = demo_alert(alert)
-        if is_demo and request.args.get('include_demo') != '1':
+        if is_demo and request.args.get('include_demo') != '1' and not current_app.config.get('DEMO_MODE', False):
             continue
         metadata = alert.to_dict()
         risk_level = compute_risk_score(float(alert.affected_lat), float(alert.affected_lng), float(alert.affected_radius_km), alert.severity, alert.description)

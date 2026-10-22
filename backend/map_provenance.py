@@ -16,7 +16,8 @@ LEGACY_REQUESTS = {
 
 
 def demo_alert(alert):
-    explicit = (alert.source or '').lower().startswith(('demo', 'sample'))
+    explicit = ((alert.source or '').lower().startswith(('demo', 'sample'))
+                or (alert.description or '').startswith('[DEMO]'))
     legacy = (alert.source == 'OpenWeatherMap' and alert.description == LEGACY_FLOOD_TEXT
               and alert.alert_type == 'Flood' and alert.severity == 'Emergency'
               and float(alert.affected_lat) == 17.4401 and float(alert.affected_lng) == 78.4487
@@ -26,7 +27,8 @@ def demo_alert(alert):
 
 def demo_alert_filter(model):
     """Equivalent SQL predicate so bounded alert lists filter before LIMIT."""
-    return or_(model.source.ilike('demo%'), model.source.ilike('sample%'), and_(
+    return or_(model.source.ilike('demo%'), model.source.ilike('sample%'),
+               model.description.like('[DEMO]%'), and_(
         model.source == 'OpenWeatherMap', model.description == LEGACY_FLOOD_TEXT,
         model.alert_type == 'Flood', model.severity == 'Emergency',
         model.affected_lat == 17.4401, model.affected_lng == 78.4487, model.affected_radius_km == 50))
@@ -36,6 +38,8 @@ def demo_incident(record, kind):
     if (record.description or '').startswith('[DEMO]'):
         return True
     email = record.user.email if record.user else None
+    if (email or '').endswith('@resqnet-demo.invalid') and record.user.name.startswith('[DEMO] '):
+        return True
     coords = (round(float(record.latitude), 6), round(float(record.longitude), 6))
     if kind == 'report':
         return (email, record.description, *coords) in LEGACY_REPORTS

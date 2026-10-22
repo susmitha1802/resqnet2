@@ -7,6 +7,10 @@ from sqlalchemy.engine import make_url
 
 
 DEMO_ACCOUNT_EMAILS = frozenset({
+    'admin@resqnet-demo.invalid', 'relief-one@resqnet-demo.invalid',
+    'relief-two@resqnet-demo.invalid', 'volunteer-one@resqnet-demo.invalid',
+    'volunteer-two@resqnet-demo.invalid', 'volunteer-three@resqnet-demo.invalid',
+    'citizen-one@resqnet-demo.invalid', 'citizen-two@resqnet-demo.invalid',
     'admin@resqnet.com', 'redcross@resqnet.com', 'globalrelief@resqnet.com',
     'vol1@resqnet.com', 'vol2@resqnet.com', 'vol3@resqnet.com',
     'reporter1@resqnet.com', 'reporter2@resqnet.com',
@@ -44,8 +48,8 @@ def validate_runtime_config(app):
     admin_code = config.get('ADMIN_SECRET_CODE')
     if admin_code and (not isinstance(admin_code, str) or len(admin_code) < 32):
         raise RuntimeError('Production ADMIN_SECRET_CODE must be strong or unset to disable admin registration.')
-    if config.get('DEBUG') or config.get('SEED_DEMO_DATA'):
-        raise RuntimeError('Production requires DEBUG=False and SEED_DEMO_DATA=False.')
+    if config.get('DEBUG') or config.get('SEED_DEMO_DATA') or config.get('DEMO_MODE'):
+        raise RuntimeError('Production requires DEBUG=False, SEED_DEMO_DATA=False and DEMO_MODE=False.')
     hops = config.get('TRUSTED_PROXY_HOPS', 0)
     if type(hops) is not int or not 0 <= hops <= 5:
         raise RuntimeError('TRUSTED_PROXY_HOPS must be an integer from 0 to 5.')

@@ -496,7 +496,7 @@ def create_app(config_class=Config) -> Flask:
         viewer = _get_current_user() if get_jwt_identity() is not None else None
         if get_jwt_identity() is not None and viewer is None:
             return jsonify(success=False, message='Invalid session identity'), 401
-        include_demo = request.args.get('include_demo') == '1'
+        include_demo = request.args.get('include_demo') == '1' or app.config.get('DEMO_MODE', False)
         requests = [r for r in requests if include_demo or not demo_incident(r, 'request')]
         requests_data = [request_view(r, viewer) for r in requests]
 
@@ -517,6 +517,7 @@ def create_app(config_class=Config) -> Flask:
 
         return jsonify({
             'success':          True,
+            'demo_mode':        bool(app.config.get('DEMO_MODE', False)),
             'visibility':       'aggregate-only' if viewer is None else 'authorized',
             'requests':         requests_data,
             'reports':          [report_view(r, viewer) for r in reports],
@@ -549,6 +550,7 @@ def create_app(config_class=Config) -> Flask:
         
         return jsonify({
             'success': True,
+            'demo_mode': bool(app.config.get('DEMO_MODE', False)),
             'stats': {
                 'total_requests': total_requests,
                 'active_requests': active_reqs,

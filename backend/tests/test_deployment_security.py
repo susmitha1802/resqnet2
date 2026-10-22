@@ -45,7 +45,8 @@ class DeploymentSecurityTests(unittest.TestCase):
 
     def test_production_rejects_missing_weak_secrets_debug_demo_and_wildcard_cors(self):
         for invalid in [{'JWT_SECRET_KEY':None}, {'JWT_SECRET_KEY':'your_jwt_secret'}, {'SECRET_KEY':None},
-                        {'DEBUG':True}, {'SEED_DEMO_DATA':True}, {'ADMIN_SECRET_CODE':'weak-demo-code'},
+                        {'DEBUG':True}, {'SEED_DEMO_DATA':True}, {'DEMO_MODE':True},
+                        {'ADMIN_SECRET_CODE':'weak-demo-code'},
                         {'CORS_ORIGINS':['*']}, {'CORS_ORIGINS':[]}]:
             with self.subTest(setting=next(iter(invalid))):
                 with self.assertRaises((RuntimeError, ValueError)):

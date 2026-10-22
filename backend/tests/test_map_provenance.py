@@ -13,6 +13,7 @@ from extensions import db
 from models import WeatherAlert, User, HelpRequest, DisasterReport
 from flask_jwt_extended import create_access_token
 from map_provenance import LEGACY_FLOOD_TEXT
+from seed_demo import TAG
 
 
 class MapProvenanceTests(unittest.TestCase):
@@ -43,7 +44,7 @@ class MapProvenanceTests(unittest.TestCase):
 
     def test_seed_alert_is_explicit_demo_and_hidden_by_default(self):
         alert = WeatherAlert.query.one()
-        self.assertEqual(alert.description, LEGACY_FLOOD_TEXT)
+        self.assertTrue(alert.description.startswith(TAG))
         self.assertEqual(alert.source, 'Demo seed data')
         self.assertEqual(self.client.get('/map/risk-zones').json['zones'], [])
         self.assertEqual(self.client.get('/alerts').json['alerts'], [])
@@ -54,7 +55,11 @@ class MapProvenanceTests(unittest.TestCase):
         self.assertEqual((preview['lat'], preview['lng']), (17.4401, 78.4487))
 
     def test_legacy_seed_with_false_weather_source_is_still_identified(self):
-        WeatherAlert.query.one().source = 'OpenWeatherMap'
+        alert = WeatherAlert.query.one()
+        alert.source = 'OpenWeatherMap'
+        alert.description = LEGACY_FLOOD_TEXT
+        alert.severity = 'Emergency'
+        alert.affected_radius_km = 50
         db.session.commit()
         self.assertEqual(self.client.get('/map/risk-zones').json['zones'], [])
         alert = self.client.get('/alerts?include_demo=1').json['alerts'][0]

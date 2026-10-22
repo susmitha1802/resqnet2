@@ -97,6 +97,9 @@ test('homepage statistics show real zero counts, empty data and unavailable stat
   assert.equal(elements.get('hero-stat-volunteers').textContent,1);
   assert.equal(elements.get('hero-stat-completed').textContent,2);
   assert.doesNotMatch(elements.get('stats-message').textContent,/No SOS requests/);
+  result={...result,demo_mode:true};
+  await context.loadStats();
+  assert.match(elements.get('stats-message').textContent,/DEMO STAGING DATA.*fictional/);
   result={success:false};
   await context.loadStats();
   assert.equal(elements.get('hero-stat-requests').textContent,'Unavailable');
@@ -118,6 +121,9 @@ test('homepage activity distinguishes empty, redacted and unavailable data', asy
   await context.loadLiveFeed();
   assert.match(feed.textContent,/3 active SOS or community report records/);
   assert.match(feed.textContent,/authorized map view/);
+  result={...result,demo_mode:true};
+  await context.loadLiveFeed();
+  assert.match(feed.textContent,/DEMO STAGING DATA.*fictional/);
   result={success:false};
   await context.loadLiveFeed();
   assert.match(feed.textContent,/unavailable/);

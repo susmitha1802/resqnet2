@@ -775,7 +775,7 @@
             ? `${count} active SOS or community report records are listed. Sign in for your authorized map view.`
             : count === 0 ? 'No active SOS or community report records are currently listed.'
               : 'Activity counts are unavailable right now.';
-          el.textContent = message;
+          el.textContent = data.demo_mode ? `DEMO STAGING DATA — fictional records only. ${message}` : message;
           return;
         }
         el.innerHTML = requests.map(r => {
@@ -808,9 +808,11 @@
         set('hero-stat-completed', stats.completed);
         set('status-incidents', stats.active_requests);
         set('status-volunteers', stats.active_volunteers);
-        set('stats-message', stats.total_requests === 0 && stats.total_volunteers === 0
-          ? 'No SOS requests or volunteer registrations have been recorded yet.'
-          : 'Counts reflect database records, not live dispatch activity.');
+        set('stats-message', data.demo_mode
+          ? 'DEMO STAGING DATA — fictional records only; no live dispatch activity.'
+          : stats.total_requests === 0 && stats.total_volunteers === 0
+            ? 'No SOS requests or volunteer registrations have been recorded yet.'
+            : 'Counts reflect database records, not live dispatch activity.');
       } catch (e) {
         ['hero-stat-requests', 'hero-stat-volunteers', 'hero-stat-completed', 'status-incidents', 'status-volunteers'].forEach(id => { const el = document.getElementById(id); if (el) el.textContent = 'Unavailable'; });
         const message = document.getElementById('stats-message');

@@ -10,7 +10,7 @@ PUT  /preparedness/ping/<id>  — volunteer/NGO acknowledges or marks unavailabl
 """
 import os, math, urllib.request, json
 from datetime import datetime, timezone
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, current_app, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from routes.middleware import require_role
 from extensions import db
@@ -60,7 +60,7 @@ def _users_in_radius(lat, lng, radius_km):
 def list_alerts():
     query = WeatherAlert.query.filter(or_(WeatherAlert.expires_at.is_(None),
         WeatherAlert.expires_at > datetime.now(timezone.utc)))
-    if request.args.get('include_demo') != '1':
+    if request.args.get('include_demo') != '1' and not current_app.config.get('DEMO_MODE', False):
         query = query.filter(~demo_alert_filter(WeatherAlert))
     alerts = query.order_by(WeatherAlert.issued_at.desc()).limit(20).all()
     return jsonify({'success': True, 'alerts': [a.to_dict() for a in alerts]}), 200

@@ -14,6 +14,7 @@ class Config:
     SECRET_KEY = os.getenv('SECRET_KEY')
     DEBUG = os.getenv('FLASK_DEBUG', 'False') == 'True'
     SEED_DEMO_DATA = os.getenv('SEED_DEMO_DATA', 'False') == 'True'
+    DEMO_MODE = os.getenv('DEMO_MODE', 'False') == 'True'
 
     # ── Database Configuration ──
     # Supabase's session pooler uses an IPv4-compatible PostgreSQL connection.
