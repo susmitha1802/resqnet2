@@ -107,15 +107,16 @@ def main():
         with Session(engine) as session, session.begin():
             rows = _rows(session)
             if args.action == 'status':
-                print('Demo map fixture:', 'absent' if not rows else
-                      'intact (3 scenarios)' if _intact(rows) else 'incomplete or changed')
+                result = 'Demo map fixture: ' + ('absent' if not rows else
+                         'intact (3 scenarios)' if _intact(rows) else 'incomplete or changed')
             elif args.action == 'seed':
-                print('Created three fictional map scenarios.' if seed_map_demo(session)
-                      else 'Three fictional map scenarios already present.')
+                result = ('Created three fictional map scenarios.' if seed_map_demo(session)
+                          else 'Three fictional map scenarios already present.')
             else:
-                print('Removed only the three fictional map scenarios.' if cleanup_map_demo(session)
-                      else 'No fictional map scenarios present.')
+                result = ('Removed only the three fictional map scenarios.' if cleanup_map_demo(session)
+                          else 'No fictional map scenarios present.')
         engine.dispose()
+        print(result)
     except Exception:
         # SQLAlchemy exceptions can embed connection URLs. Never print them here.
         raise SystemExit('Demo map command failed; no connection details were printed.') from None
