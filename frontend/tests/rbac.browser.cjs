@@ -130,7 +130,8 @@ async function main() {
       const layout = await evaluate(`(() => {
         const bounds = selector => { const r=document.querySelector(selector).getBoundingClientRect();
           return {left:r.left,right:r.right,top:r.top,width:r.width}; };
-        return {viewport:innerWidth,chat:bounds('#resq-chat-panel'),
+        return {viewport:innerWidth,pageWidth:document.documentElement.scrollWidth,
+          chat:bounds('#resq-chat-panel'),
           weather:bounds('.weather-overview'),stats:bounds('.home-stats-grid'),
           first:bounds('.home-stat-card:first-child'),second:bounds('.home-stat-card:nth-child(2)')};
       })()`);
@@ -138,6 +139,8 @@ async function main() {
         assert.ok(layout[name].left >= -1 && layout[name].right <= width+1,
           name+' must fit '+width+'px viewport: '+JSON.stringify(layout));
       }
+      assert.ok(layout.pageWidth <= width+1,
+        'homepage must not scroll horizontally at '+width+'px: '+JSON.stringify(layout));
       assert.equal(width===390, layout.second.top > layout.first.top,
         'statistics cards should stack only on the phone viewport');
     }

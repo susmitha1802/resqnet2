@@ -273,6 +273,13 @@
       font-family: 'Space Grotesk', sans-serif;
     }
 
+    .home-footer-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 2fr) repeat(3, minmax(0, 1fr));
+      gap: 40px;
+      margin-bottom: 40px;
+    }
+
     @media(max-width:768px) {
       .hero-section {
         padding-top: calc(var(--topbar-h) + 20px);
@@ -280,6 +287,17 @@
 
       .ai-panel-content {
         padding: 28px;
+      }
+
+      .home-footer-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 28px;
+      }
+    }
+
+    @media(max-width:480px) {
+      .home-footer-grid {
+        grid-template-columns: minmax(0, 1fr);
       }
     }
   </style>
@@ -660,7 +678,7 @@
   <!-- FOOTER -->
   <footer class="resq-footer">
     <div class="container">
-      <div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:40px;margin-bottom:40px;flex-wrap:wrap;">
+      <div class="home-footer-grid">
         <div>
           <div style="font-weight:800;font-size:1.1rem;margin-bottom:12px;">Res<span
               style="color:var(--accent-red);">Q</span>Net</div>
