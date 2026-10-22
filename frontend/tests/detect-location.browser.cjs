@@ -61,6 +61,11 @@ async function main() {
             ? [{ lat: '28.6139', lon: '77.2090', display_name: 'New Delhi, India' }]
             : { display_name: 'Mock Road, Mock Town, Mock State' } });
           type = 'application/json';
+        } else if (request.url.includes('/map/demo-scenarios')) {
+          body = JSON.stringify({success:true,scenarios:[{title:'Fictional coastal exercise',
+            latitude:17.6868,longitude:83.2185,is_demo:true,
+            notice:'FICTIONAL DEMO location. Not a real incident or alert.'}]});
+          type = 'application/json';
         } else if (request.url.includes('/map/data')) {
           body = JSON.stringify({ success: true, requests: [{ request_id: 1, request_type: 'Food', priority_level: 'Medium',
             number_of_people: 2, latitude: 9.9312, longitude: 76.2673, status: 'On Site', source: 'Community SOS request' }],
@@ -95,7 +100,7 @@ async function main() {
     });
     await send('Page.enable');
     await send('Fetch.enable', { patterns: ['*/geocode?*', '*tile.openstreetmap.org*', '*basemaps.cartocdn.com*',
-      '*/map/data*', '*/map/risk-zones*', '*/ngo/locations*'].map(urlPattern => ({ urlPattern })) });
+      '*/map/data*', '*/map/demo-scenarios*', '*/map/risk-zones*', '*/ngo/locations*'].map(urlPattern => ({ urlPattern })) });
     await send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
     await send('Emulation.setGeolocationOverride', { latitude: 17.4401, longitude: 78.4487, accuracy: 5 });
     await send('Page.addScriptToEvaluateOnNewDocument', { source: `localStorage.setItem('resqnet_user', JSON.stringify({user_id:1,name:'Location Test',role:'reporter'})); localStorage.setItem('resqnet_token','demo-token-location-test'); localStorage.setItem('resqnet_role','reporter');` });
@@ -154,6 +159,22 @@ async function main() {
     assert.match(depots, /Valid depot/);
     assert.doesNotMatch(depots, /Unknown depot|Invalid depot/);
     console.log('PASS browser: live map overview, valid-only NGO markers, legacy demo alert hidden, Flood Intelligence warning retained');
+
+    await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: false });
+    await send('Page.navigate', {url:`${origin}/map.html?demo=1`});
+    for (let n=0;n<100;n++) {
+      if (await evaluate(`document.getElementById('map-demo-banner')?.hidden === false &&
+        [...document.querySelectorAll('.leaflet-marker-icon')].some(el=>el.textContent.includes('DEMO'))`)) break;
+      await delay(100);
+    }
+    assert.match(await evaluate(`document.getElementById('map-demo-banner').textContent`), /FICTIONAL DEMO SCENARIOS/);
+    assert.ok(await evaluate(`document.getElementById('map-demo-banner').getBoundingClientRect().right <= innerWidth`));
+    assert.equal(await evaluate(`document.getElementById('map-demo-toggle').getAttribute('aria-pressed')`),'true');
+    assert.equal(await evaluate(`document.getElementById('live-count').textContent`),'2');
+    await evaluate(`document.getElementById('map-demo-toggle').click()`);
+    assert.equal(await evaluate(`document.getElementById('map-demo-banner').hidden`),true);
+    console.log('PASS browser: opt-in fictional map markers are labeled and separate from live counts');
+    await send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
 
     await send('Page.navigate', { url: `${origin}/map.html?report_id=2` });
     for (let n = 0; n < 100; n++) {

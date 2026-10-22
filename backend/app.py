@@ -531,6 +531,18 @@ def create_app(config_class=Config) -> Flask:
             'total_active':     total_active,
         })
 
+    @app.route('/map/demo-scenarios', methods=['GET'])
+    def map_demo_scenarios():
+        """Expose only the complete, fixed fictional map fixture; no incident data."""
+        from public_map_demo import NOTICE, SCENARIOS, _intact, _rows
+        rows = _rows(db.session)
+        scenarios = ([{'title': title, 'latitude': lat, 'longitude': lng,
+                       'notice': NOTICE, 'is_demo': True}
+                      for title, lat, lng in SCENARIOS] if _intact(rows) else [])
+        response = jsonify(success=True, scenarios=scenarios)
+        response.headers['Cache-Control'] = 'no-store'
+        return response
+
     @app.route('/public/stats', methods=['GET'])
     def public_stats():
         """Public homepage statistics."""

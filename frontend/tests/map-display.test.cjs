@@ -7,16 +7,21 @@ const vm = require('node:vm');
 function setup(search = '') {
   const elements = new Map(), markers = [], circles = [], intervals = [];
   let init, api = { success: true, requests: [], reports: [], volunteers: [] };
+  let demoApi = {success:true,scenarios:[]};
   const map = { views: [], fits: [], on() {}, removeLayer() {}, setView(point, zoom) { this.views.push({ point, zoom }); }, fitBounds(bounds) { this.fits.push(bounds); } };
-  const group = () => ({ addTo() { return this; } });
+  const group = () => ({ items: [], addLayer(item) { this.items.push(item); },
+    getLayers() { return this.items; }, addTo() { return this; } });
   const mark = coords => ({ coords, getLatLng: () => coords, bindPopup(html) { this.popup = html; return this; },
-    bindTooltip() { return this; }, addTo() { return this; }, openPopup() { this.opened = true; } });
+    bindTooltip() { return this; }, addTo(target) { target?.addLayer?.(this); return this; }, openPopup() { this.opened = true; } });
   const context = {
-    URLSearchParams, location: { search }, console,
-    document: { getElementById: id => { if (!elements.has(id)) elements.set(id, { style: {}, textContent: '' }); return elements.get(id); },
+    URL, URLSearchParams, location: { search, href: 'http://local/map.html'+search, pathname: '/map.html' }, console,
+    history: {replaceState() {}},
+    document: { getElementById: id => { if (!elements.has(id)) elements.set(id, { style: {}, textContent: '',
+      setAttribute(name, value) { this[name] = value; } }); return elements.get(id); },
       querySelectorAll: () => [], createElement: () => ({}), head: { appendChild() {} } },
     addEventListener: (_name, handler) => { init = handler; }, setInterval: callback => intervals.push(callback),
-    Api: { BASE: 'http://local-api', get: async () => api }, FloodIntelligence: { attach() {} }, Toast: { show() {} },
+    Api: { BASE: 'http://local-api', get: async endpoint => endpoint === '/map/demo-scenarios' ? demoApi : api },
+    FloodIntelligence: { attach() {} }, Toast: { show() {} },
     fetch: async () => ({ ok: true, json: async () => ({ zones: [], locations: [] }) }),
     L: { layerGroup: group, marker: coords => { const item = mark(coords); markers.push(item); return item; },
       circle: coords => { const item = mark(coords); circles.push(item); return item; }, divIcon: value => value },
@@ -29,8 +34,31 @@ function setup(search = '') {
   const html = fs.readFileSync(path.join(__dirname, '../map.html'), 'utf8');
   const inline = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map(m => m[1]).find(s => s.includes('async function loadMapData'));
   vm.runInContext(inline, context);
-  return { context, map, markers, circles, intervals, init: () => init(), data: value => { api = value; } };
+  return { context, map, markers, circles, intervals, init: () => init(),
+    data: value => { api = value; }, demoData: value => { demoApi = value; }, elements };
 }
+
+test('fictional map markers are opt-in, labeled and excluded from live incident counts', async () => {
+  const scenario = {title:'<fake>', latitude:17.6868, longitude:83.2185,
+    notice:'FICTIONAL DEMO location',is_demo:true};
+  const normal = setup();
+  normal.demoData({success:true,scenarios:[scenario]});
+  await normal.init();
+  assert.equal(normal.markers.length,0);
+  assert.equal(normal.elements.get('live-count').textContent,0);
+  const demo = setup('?demo=1');
+  demo.demoData({success:true,scenarios:[scenario]});
+  await demo.init();
+  assert.equal(demo.markers.length,1);
+  assert.match(demo.markers[0].popup,/FICTIONAL DEMO/);
+  assert.match(demo.markers[0].popup,/&lt;fake&gt;/);
+  assert.equal(demo.elements.get('map-demo-banner').hidden,false);
+  assert.equal(demo.elements.get('live-count').textContent,0);
+  assert.equal(demo.elements.get('map-demo-toggle')['aria-pressed'],'true');
+  demo.context.toggleDemoScenarios();
+  await Promise.resolve();
+  assert.equal(demo.elements.get('map-demo-banner').hidden,true);
+});
 
 const request = { request_id: 1, request_type: 'Rescue', priority_level: 'High', number_of_people: 2,
   latitude: 9.9312, longitude: 76.2673, status: 'En Route', source: 'Community SOS request', description: 'Kochi request' };

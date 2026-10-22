@@ -102,6 +102,21 @@
       margin-left: auto;
     }
 
+    .map-demo-banner {
+      position: fixed;
+      left: 16px;
+      bottom: 16px;
+      z-index: 500;
+      max-width: min(380px, calc(100vw - 32px));
+      padding: 10px 14px;
+      border: 2px dashed #38bdf8;
+      border-radius: 8px;
+      background: rgba(10, 23, 42, 0.96);
+      color: #e0f2fe;
+      font-size: 0.82rem;
+      font-weight: 700;
+    }
+
     /* Back to dashboard link */
     .map-back-link {
       color: var(--text-secondary);
@@ -166,6 +181,8 @@
     <!-- Filter Chips -->
     <div class="map-filters" id="map-filters-bar">
       <button class="map-filter-chip active" onclick="applyMapFilter('All')">All</button>
+      <button type="button" class="map-filter-chip" id="map-demo-toggle" aria-pressed="false"
+        onclick="toggleDemoScenarios()">Show DEMO</button>
       <button class="map-filter-chip" onclick="applyMapFilter('High')">🔴 High</button>
       <button class="map-filter-chip" onclick="applyMapFilter('Medium')">🟡 Medium</button>
       <button class="map-filter-chip" onclick="applyMapFilter('Low')">🟢 Low</button>
@@ -245,6 +262,10 @@
 
   <div id="toast-container"></div>
 
+  <div id="map-demo-banner" class="map-demo-banner" role="status" hidden>
+    FICTIONAL DEMO SCENARIOS — not real incidents, active alerts, or SOS requests.
+  </div>
+
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
   <script src="js/api.js"></script>
@@ -259,7 +280,9 @@
       requests: null,
       volunteers: null,
       disasters: null,
+      demo: null,
     };
+    let showDemoScenarios = new URLSearchParams(location.search).get('demo') === '1';
 
     /* ── Init ── */
     window.addEventListener('DOMContentLoaded', async () => {
@@ -274,6 +297,7 @@
       });
 
       await loadMapData();
+      await loadDemoScenarios();
       setInterval(loadMapData, 15_000);
 
       loadRiskZones(map);
@@ -281,6 +305,51 @@
     });
 
     let currentMapFilter = 'All';
+
+    window.toggleDemoScenarios = function () {
+      showDemoScenarios = !showDemoScenarios;
+      const url = new URL(location.href);
+      if (showDemoScenarios) url.searchParams.set('demo', '1');
+      else url.searchParams.delete('demo');
+      history.replaceState(null, '', url.pathname + url.search);
+      loadDemoScenarios();
+    };
+
+    async function loadDemoScenarios() {
+      const toggle = document.getElementById('map-demo-toggle');
+      const banner = document.getElementById('map-demo-banner');
+      toggle.setAttribute('aria-pressed', String(showDemoScenarios));
+      toggle.textContent = showDemoScenarios ? 'Hide DEMO' : 'Show DEMO';
+      const hadDemoLayer = !!layers.demo;
+      if (layers.demo) map.removeLayer(layers.demo);
+      layers.demo = null;
+      banner.hidden = true;
+      if (!showDemoScenarios) {
+        if (hadDemoLayer) loadMapData();
+        return;
+      }
+      const data = await Api.get('/map/demo-scenarios');
+      if (!data?.success || !Array.isArray(data.scenarios) || !data.scenarios.length) {
+        banner.textContent = 'FICTIONAL DEMO scenarios are unavailable.';
+        banner.hidden = false;
+        return;
+      }
+      const group = L.layerGroup();
+      for (const scenario of data.scenarios) {
+        if (scenario.is_demo !== true || !ResQMap.hasCoordinates(scenario.latitude, scenario.longitude)) continue;
+        const icon = L.divIcon({className: '', html: '<div style="background:#0f2945;color:#e0f2fe;border:2px dashed #38bdf8;border-radius:6px;padding:5px;font-size:10px;font-weight:800">DEMO</div>',
+          iconSize: [54, 28], iconAnchor: [27, 14]});
+        L.marker([scenario.latitude, scenario.longitude], {icon})
+          .bindPopup(ResQMap.popupHtml(`<strong>FICTIONAL DEMO</strong><br>${ResQMap.escapeHtml(scenario.title)}<br>${ResQMap.escapeHtml(scenario.notice)}`))
+          .addTo(group);
+      }
+      if (!group.getLayers().length) return;
+      group.addTo(map);
+      layers.demo = group;
+      document.getElementById('map-empty-state').style.display = 'none';
+      banner.textContent = 'FICTIONAL DEMO SCENARIOS — not real incidents, active alerts, or SOS requests.';
+      banner.hidden = false;
+    }
 
     window.applyMapFilter = function (filter) {
       currentMapFilter = filter;
@@ -420,7 +489,7 @@
         emptyState.textContent = data.visibility === 'aggregate-only'
           ? 'Sign in to view incidents available to your role. Public totals do not reveal private locations.'
           : 'No incidents are visible for your account and current filters.';
-        emptyState.style.display = totalVisibleMarkers === 0 ? 'block' : 'none';
+        emptyState.style.display = totalVisibleMarkers === 0 && !layers.demo ? 'block' : 'none';
       }
 
       const params = new URLSearchParams(location.search);

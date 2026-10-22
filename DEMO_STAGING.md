@@ -59,3 +59,7 @@ local commands also refuse to run under `APP_ENV=production` or on Render.
 No live demo data will appear on the current Netlify/Render deployment until a
 separate staging deployment is established or production seeding is explicitly
 approved and redesigned with suitable safeguards.
+
+For a separately approved, narrow **fictional map overlay** on the current
+Supabase database, see [PUBLIC_MAP_DEMO.md](PUBLIC_MAP_DEMO.md). That operation
+does not copy these staging accounts, SOS requests or reports to production.
