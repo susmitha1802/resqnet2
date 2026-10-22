@@ -44,3 +44,29 @@ test('Netlify build refuses absent or non-HTTPS API configuration', () => {
     }
   } finally { cleanup(temp); }
 });
+
+test('Netlify default dist can be rebuilt while custom output is never overwritten', () => {
+  const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'resqnet-netlify-'));
+  try {
+    const fakeRoot = path.join(temp, 'site');
+    fs.mkdirSync(path.join(fakeRoot, 'scripts'), {recursive:true});
+    fs.cpSync(path.join(root, 'frontend'), path.join(fakeRoot, 'frontend'), {recursive:true});
+    fs.copyFileSync(script, path.join(fakeRoot, 'scripts', 'build-netlify.cjs'));
+    const localScript = path.join(fakeRoot, 'scripts', 'build-netlify.cjs');
+    const env = {...process.env, RESQNET_API_BASE:'https://api.example.invalid'};
+    delete env.RESQNET_BUILD_OUTPUT;
+    let built = spawnSync(process.execPath, [localScript], {cwd:fakeRoot,env,encoding:'utf8'});
+    assert.equal(built.status,0,built.stderr);
+    built = spawnSync(process.execPath, [localScript], {cwd:fakeRoot,env,encoding:'utf8'});
+    assert.equal(built.status,0,built.stderr);
+    const api = fs.readFileSync(path.join(fakeRoot,'dist','js','api.js'),'utf8');
+    assert.match(api,/https:\/\/api\.example\.invalid/);
+    const custom = path.join(temp,'custom');
+    fs.mkdirSync(custom);
+    fs.writeFileSync(path.join(custom,'keep.txt'),'not generated');
+    built = spawnSync(process.execPath, [localScript], {cwd:fakeRoot,
+      env:{...env,RESQNET_BUILD_OUTPUT:custom},encoding:'utf8'});
+    assert.notEqual(built.status,0);
+    assert.equal(fs.readFileSync(path.join(custom,'keep.txt'),'utf8'),'not generated');
+  } finally { cleanup(temp); }
+});
